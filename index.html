@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>VMS Chatbot</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    #chat { white-space: pre-wrap; background: #f0f0f0; padding: 10px; height: 300px; overflow-y: scroll; border: 1px solid #ccc; margin-bottom: 10px; }
+    input, button { padding: 8px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h2>VMS Chatbot</h2>
+  <label>IMEI: <input id="imeiInput" /></label>
+  <button onclick="connectWS()">Connect</button><br><br>
+  <div id="chat"></div>
+  <input id="questionInput" placeholder="Type your question..." style="width: 70%;" />
+  <button onclick="sendQuestion()">Send</button>
+
+  <script>
+    let ws;
+    function connectWS() {
+      const imei = document.getElementById("imeiInput").value.trim();
+      if (!imei) return alert("Please enter IMEI");
+      ws = new WebSocket("ws://localhost:8000/ws/chat");
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ imei }));
+        appendChat("System: Connected to server.");
+      };
+      ws.onmessage = (event) => {
+        appendChat("Bot: " + event.data);
+      };
+      ws.onclose = () => appendChat("System: Disconnected.");
+    }
+
+    function sendQuestion() {
+      const question = document.getElementById("questionInput").value.trim();
+      if (!question || !ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ question }));
+      appendChat("You: " + question);
+      document.getElementById("questionInput").value = "";
+    }
+
+    function appendChat(text) {
+      const chat = document.getElementById("chat");
+      chat.textContent += text + "\n";
+      chat.scrollTop = chat.scrollHeight;
+    }
+  </script>
+</body>
+</html>

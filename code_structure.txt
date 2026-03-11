@@ -1,0 +1,50 @@
+vehicle_ai_platform/
+
+app/
+│
+├── api/
+│   └── server.py
+│
+├── agent/
+│   ├── query_service.py
+│   ├── intent_extractor.py
+│   ├── planner.py
+│   └── router.py
+│
+├── tools/
+│   ├── telemetry_tool.py
+│   ├── analytics_tool.py
+│   └── external_api_tool.py
+│
+├── analytics/
+│   ├── trend.py
+│   ├── anomaly.py
+│   └── aggregation.py
+│
+├── db/
+│   ├── connection.py
+│   └── telemetry_repository.py
+│
+├── llm/
+│   └── ollama_client.py
+│
+├── models/
+│   └── intent_schema.py
+│
+├── config/
+│   └── settings.py
+│
+└── utils/
+    └── time_parser.py
+
+env/
+│
+├── dev.env
+└── prod.env
+
+docker/
+│
+├── Dockerfile
+└── docker-compose.yml
+
+requirements.txt

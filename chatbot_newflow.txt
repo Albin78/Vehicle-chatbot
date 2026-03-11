@@ -1,0 +1,34 @@
+                ┌─────────────────────┐
+User Query ---> │ API Gateway        │
+                │ (FastAPI)          │
+                └─────────┬──────────┘
+                          │
+                          ▼
+               ┌─────────────────────┐
+               │ Query Understanding │
+               │ (LLM Intent Model)  │
+               └─────────┬──────────┘
+                         │
+                         ▼
+                ┌─────────────────────┐
+                │ Task Planner Agent  │
+                │ (LLM + Schema)      │
+                └─────────┬──────────┘
+                          │
+      ┌───────────────────┼──────────────────┐
+      ▼                   ▼                  ▼
+Telemetry Tool      Analytics Tool      External API Tool
+(Mongo query)       (avg/trend/etc)     (Battery API)
+
+      ▼                   ▼                  ▼
+            ┌─────────────────────────┐
+            │ Tool Result Validator   │
+            └───────────┬─────────────┘
+                        ▼
+              ┌──────────────────────┐
+              │ Response Generator   │
+              │ (LLM grounded)       │
+              └──────────┬───────────┘
+                         ▼
+                     Response
+                     

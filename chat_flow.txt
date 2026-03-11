@@ -1,0 +1,41 @@
+                   USER
+                    │
+                    ▼
+           ┌─────────────────┐
+           │       API       │
+           └────────┬────────┘
+                    │
+                    ▼
+           ┌─────────────────┐
+           │  Query Service  │
+           │ (LLM Agent)     │
+           └────────┬────────┘
+                    │
+                    ▼
+           ┌─────────────────┐
+           │ Intent Parser   │
+           │ + Query Planner │
+           └────────┬────────┘
+                    │
+                    ▼
+           ┌─────────────────┐
+           │ Tool Router     │
+           └────────┬────────┘
+                    │
+     ┌──────────────┼───────────────┐
+     ▼              ▼               ▼
+Telemetry Tool   Analytics Tool   External API Tool
+     │              │               │
+     ▼              ▼               ▼
+  MongoDB       Analytics Engine   Battery API
+     │              │               │
+     └──────────────┴───────────────┘
+                    │
+                    ▼
+             Processed Result
+                    │
+                    ▼
+              LLM Summarizer
+                    │
+                    ▼
+                  USER
