@@ -4,18 +4,20 @@ from app.config import settings
 
 class OllamaClient:
 
-    def __init__(self):
-        self.url = f"{settings.OLLAMA_URL}/api/generate"
-
-    def generate(self, prompt):
+    def generate(self, prompt: str):
 
         response = requests.post(
-            self.url,
+            f"{settings.OLLAMA_URL}",
             json={
                 "model": settings.OLLAMA_MODEL,
                 "prompt": prompt,
                 "stream": False
-            }
+            },
+            timeout=30
         )
 
-        return response.json()["response"]
+        response.raise_for_status()
+
+        data = response.json()
+
+        return data["response"]

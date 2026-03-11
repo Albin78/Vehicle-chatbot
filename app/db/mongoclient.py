@@ -7,4 +7,4 @@ db = client[settings.MONGO_DB]
 
 
 def get_collection():
-    return db["telemetry"]
+    return db[settings.MONGO_COLLECTION]

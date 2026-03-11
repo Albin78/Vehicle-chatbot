@@ -1,4 +1,4 @@
-from app.db.mongo_client import get_collection
+from app.db.mongoclient import get_collection
 
 
 def fetch_telemetry(imei, metric):

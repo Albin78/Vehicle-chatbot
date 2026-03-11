@@ -7,17 +7,22 @@ llm = OllamaClient()
 def extract_intent(query: str) -> QueryIntent:
 
     prompt = f"""
-    Extract telemetry query intent.
+    Extract the intent and imei from the query.
 
-    Query: {query}
+Return ONLY valid JSON.
 
-    Return JSON:
-    metric
-    imei
-    aggregation
-    analysis
-    time_range
-    service
+Schema:
+{
+ "intent": string,
+ "imei": string | null
+}
+
+Query:
+{query}
+
+Very important line:
+
+Return ONLY valid JSON. Do not include explanation.
     """
 
     response = llm.generate(prompt)
