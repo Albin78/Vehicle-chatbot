@@ -78,3 +78,5 @@ Thumbs.db
 secrets/
 *.pem
 *.key
+
+to_add.txt

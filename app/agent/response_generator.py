@@ -10,6 +10,12 @@ def generate_response(query, result):
 
     Tool Result: {result}
 
+    If the question is unrelated respond ONLY:
+    I am a VMS bot, so I am unable to answer the question.
+
+    If the speed is 0, respond ONLY:
+    The vehicle is stationary or stopped.
+
     Generate clear answer.
     """
 

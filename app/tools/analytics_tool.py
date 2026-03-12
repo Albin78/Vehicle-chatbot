@@ -1,5 +1,7 @@
 import numpy as np
+
 from app.db.mongoclient import get_collection
+from app.utils.logger import logger
 
 
 def run_analytics(imei, metric, operation):
@@ -11,6 +13,8 @@ def run_analytics(imei, metric, operation):
     values = [x[metric] for x in data if metric in x]
 
     if not values:
+        # logger.error("Empty result for IMEI: %s", imei)
+        print("Empty result for IMEI: ", imei)
         return None
 
     if operation == "avg":
