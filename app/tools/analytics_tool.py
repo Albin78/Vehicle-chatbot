@@ -10,6 +10,9 @@ def run_analytics(imei, metric, operation):
 
     values = [x[metric] for x in data if metric in x]
 
+    if not values:
+        return None
+
     if operation == "avg":
         return np.mean(values)
 

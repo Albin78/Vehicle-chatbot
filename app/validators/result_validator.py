@@ -1,6 +1,8 @@
+from fastapi import HTTPException
+
 def validate_result(result):
-
-    if result is None:
-        raise ValueError("Tool returned empty result")
-
-    return True
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail="No data found for this IMEI"
+        )

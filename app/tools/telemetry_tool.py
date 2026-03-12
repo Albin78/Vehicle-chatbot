@@ -10,4 +10,8 @@ def fetch_telemetry(imei, metric):
         sort=[("last_updated", -1)]
     )
 
-    return result.get(metric)
+    print("Result: ", result)
+    if result:
+        return result.get(metric)
+    
+    return None

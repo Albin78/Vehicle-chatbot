@@ -1,8 +1,9 @@
 from app.schemas.intent_schema import QueryIntent
 from app.schemas.plan_schema import ExecutionPlan
+from typing import Optional
 
 
-def create_plan(intent: QueryIntent) -> ExecutionPlan:
+def create_plan(intent: QueryIntent, imei: Optional[str]) -> ExecutionPlan:
 
     if intent.service:
 
@@ -10,7 +11,7 @@ def create_plan(intent: QueryIntent) -> ExecutionPlan:
             tool="external_api",
             operation=intent.service,
             metric=None,
-            imei=intent.imei,
+            imei=imei,
             time_range=None
         )
 
@@ -20,7 +21,7 @@ def create_plan(intent: QueryIntent) -> ExecutionPlan:
             tool="analytics",
             operation=intent.analysis or intent.aggregation,
             metric=intent.metric,
-            imei=intent.imei,
+            imei=imei,
             time_range=intent.time_range
         )
 
@@ -28,6 +29,6 @@ def create_plan(intent: QueryIntent) -> ExecutionPlan:
         tool="telemetry",
         operation="fetch",
         metric=intent.metric,
-        imei=intent.imei,
+        imei=imei,
         time_range=intent.time_range
     )
