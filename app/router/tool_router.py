@@ -1,4 +1,4 @@
-from app.tools.telemetry_tool import fetch_telemetry
+from app.tools.db_tool import fetch_telemetry
 from app.tools.analytics_tool import run_analytics
 from app.tools.external_api_tool import battery_service
 
