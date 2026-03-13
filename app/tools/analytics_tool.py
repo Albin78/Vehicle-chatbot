@@ -20,7 +20,7 @@ def run_analytics(imei, metric, operation):
     if operation == "average":
         average = np.mean(values)
         print("Average: ", average)
-        average_in_volt = average / 1000
+        average_in_volt = np.round(average / 1000, 2)
         print("Average in Volt: ", average_in_volt)
         return average_in_volt
 

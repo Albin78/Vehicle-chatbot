@@ -34,6 +34,15 @@ Query: {query}
 Available telemetry metrics:
 {fields}
 
+Do NOT invent information that is not present in the query.
+
+Map synonyms to the correct aggregation:
+
+average, mean, avg → "average"  
+max, highest → "maximum"  
+min, lowest → "minimum"  
+current, latest → "latest"
+
 Return ONLY valid JSON.
 
 {{
