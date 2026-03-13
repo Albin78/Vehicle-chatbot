@@ -26,7 +26,7 @@ def create_plan(intent: QueryIntent, imei: Optional[str]) -> ExecutionPlan:
         )
 
     return ExecutionPlan(
-        tool="telemetry",
+        tool="db",
         operation="fetch",
         metric=intent.metric,
         imei=imei,

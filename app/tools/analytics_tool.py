@@ -10,20 +10,28 @@ def run_analytics(imei, metric, operation):
 
     data = list(collection.find({"imei": imei}))
 
-    values = [x[metric] for x in data if metric in x]
+    values = [x.get(metric) for x in data if metric in x]
 
     if not values:
         # logger.error("Empty result for IMEI: %s", imei)
         print("Empty result for IMEI: ", imei)
         return None
 
-    if operation == "avg":
-        return np.mean(values)
+    if operation == "average":
+        average = np.mean(values)
+        print("Average: ", average)
+        average_in_volt = average / 1000
+        print("Average in Volt: ", average_in_volt)
+        return average_in_volt
 
-    if operation == "max":
-        return np.max(values)
+    if operation == "maximum":
+        maximum = np.max(values)
+        print("Maximum: ", maximum)
+        return maximum
 
-    if operation == "min":
-        return np.min(values)
+    if operation == "minimum":
+        minimum = np.min(values)
+        print("Minimum: ", minimum)
+        return minimum
 
     return None

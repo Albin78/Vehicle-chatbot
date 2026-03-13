@@ -5,7 +5,7 @@ from app.tools.external_api_tool import battery_service
 
 def route_tool(plan):
 
-    if plan.tool == "telemetry":
+    if plan.tool == "db":
         return fetch_telemetry(plan.imei, plan.metric)
 
     if plan.tool == "analytics":
