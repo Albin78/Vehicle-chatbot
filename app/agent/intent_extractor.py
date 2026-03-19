@@ -41,7 +41,6 @@ Map synonyms to the correct aggregation:
 average, mean, avg → "average"  
 max, highest → "maximum"  
 min, lowest → "minimum"  
-current, latest → "latest"
 
 Return ONLY valid JSON.
 
@@ -63,8 +62,10 @@ Return ONLY valid JSON.
         raise ValueError("No JSON found in LLM response")
 
     json_str = json_match.group()
+
+    print("Query: ", query)
     # logger.info("JSON response: ", json_str)
-    print("JSON response: ", json_str)
+    print("\nJSON response: ", json_str,"\n")
 
     data = json.loads(json_str)
     # print("JSON data: ", data)
