@@ -2,7 +2,7 @@ from fastapi import HTTPException
 
 def validate_result(result):
 
-    if result is None:
+    if not result:
         raise HTTPException(
             status_code=404,
             detail="No data found for this IMEI"

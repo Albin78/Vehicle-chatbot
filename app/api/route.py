@@ -19,7 +19,7 @@ def query_system(data: QueryRequest):
 
     if not validate_intent(intent):
         return {
-             "response": "I am a VMS chatbot, I am unable to answer that question."
+             "response": "I am a VMS chatbot, I am unable to answer the question."
         }
 
     plan = create_plan(intent, data.imei)
@@ -27,6 +27,7 @@ def query_system(data: QueryRequest):
     result = route_tool(plan)
     
     logger.info(f"Result: {result}")
+    
     validate_result(result)
 
     response = generate_response(data.query, result)

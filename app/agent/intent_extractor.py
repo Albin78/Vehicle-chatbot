@@ -67,7 +67,7 @@ Return ONLY valid JSON.
 
     Rules:
     - If query is about telemetry (battery, voltage, speed, etc.) → service = null
-    - If query asks for vehicle details, IMEI lookup, or metadata → service = "vehicle_service"
+    - If query asks for vehicle details, or metadata → service = "vehicle_service"
     - Do NOT invent information
 
     Aggregation mapping:
@@ -90,6 +90,7 @@ Return ONLY valid JSON.
 
     # Extract JSON block
     json_match = re.search(r"\{.*\}", response, re.DOTALL)
+    # json_match = re.search(r"\{.*?\}", response, re.DOTALL)
 
     if not json_match:
         raise ValueError("No JSON found in LLM response")
