@@ -53,7 +53,40 @@ Return ONLY valid JSON.
 }}
 """
 
-    response = llm.generate(prompt)
+    prompt_1 = f"""
+    You are an intent extraction system.
+
+    Query: {query}
+
+    Available telemetry metrics:
+    {fields}
+
+    Your job:
+    - Extract telemetry intent if the query is about sensor data
+    - Identify if the query is about vehicle details
+
+    Rules:
+    - If query is about telemetry (battery, voltage, speed, etc.) → service = null
+    - If query asks for vehicle details, IMEI lookup, or metadata → service = "vehicle_service"
+    - Do NOT invent information
+
+    Aggregation mapping:
+    average, mean, avg → "average"
+    max, highest → "maximum"
+    min, lowest → "minimum"
+
+    Return ONLY valid JSON:
+
+    {{
+    "metric": "one of {fields} or null",
+    "aggregation": "string | null",
+    "analysis": "string | null",
+    "time_range": "string | null",
+    "service": "vehicle_service | null"
+    }}
+    """
+
+    response = llm.generate(prompt_1)
 
     # Extract JSON block
     json_match = re.search(r"\{.*\}", response, re.DOTALL)
@@ -63,11 +96,10 @@ Return ONLY valid JSON.
 
     json_str = json_match.group()
 
-    print("Query: ", query)
-    # logger.info("JSON response: ", json_str)
-    print("\nJSON response: ", json_str,"\n")
+    logger.info(f"Query: {query}")
+    logger.info(f"JSON response: {json_str}")
 
     data = json.loads(json_str)
-    # print("JSON data: ", data)
+    logger.info(f"JSON data: {data}")
 
     return QueryIntent(**data)

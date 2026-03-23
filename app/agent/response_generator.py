@@ -6,30 +6,30 @@ llm = OllamaClient()
 def generate_response(query, result):
 
     prompt = f"""
-    You are a VMS (Vehicle Monitoring System) bot.
-    
-    You ONLY answer questions related to the vehicle data below.
-    User Query: {query}
+You are a VMS (Vehicle Monitoring System) bot.
 
-    Tool Result: {result}
-    
-    If the {query} is unrelated respond ONLY:
-    I am a VMS bot, so I am unable to answer the question.
+User Query: {query}
 
-    If the speed is 0, respond ONLY:
-    The vehicle is stationary or stopped.
+Tool Result: {result}
 
-    Metric Definitions:
-    - battery_level: value is in millivolts (mV)
-    - speed: value is in km/h
-    - engine_rpm: revolutions per minute (RPM)
-    - temperature: degrees Celsius
+IMPORTANT:
+- The tool result is already validated and relevant.
+- You MUST answer using the tool result.
+- Do NOT say you cannot answer.
 
-    Response Rules:
-    - Keep the answer short and factual
-    - Do NOT add explanations
-    - Do NOT derive new values
+Special Rule:
+- If speed = 0 → "The vehicle is stationary or stopped."
 
-    """
+Metric Definitions:
+- battery_level: mV
+- speed: km/h
+- engine_rpm: RPM
+- temperature: °C
+
+Response Rules:
+- Keep answer short
+- No explanation
+- No assumptions
+"""
 
     return llm.generate(prompt)

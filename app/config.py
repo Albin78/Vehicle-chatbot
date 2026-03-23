@@ -15,7 +15,8 @@ class Settings(BaseSettings):
 
     OLLAMA_MODEL: str
     OLLAMA_URL: str
-    # BATTERY_API_URL: str
+    BATTERY_API_URL: str
+    BATTERY_API_TOKEN: str
 
     model_config = {
         "env_file": f".env.{ENV}"
