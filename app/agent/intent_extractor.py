@@ -74,25 +74,31 @@ Return ONLY valid JSON.
     average, mean, avg → "average"
     max, highest → "maximum"
     min, lowest → "minimum"
-
-    Return ONLY valid JSON:
+    
+    Return ONLY JSON.
+    Do NOT include explanation.
+    Do NOT include markdown.
+    Do NOT include multiple JSON objects.
 
     {{
-    "metric": "one of {fields} or null",
-    "aggregation": "string | null",
-    "analysis": "string | null",
-    "time_range": "string | null",
-    "service": "vehicle_service | null"
+    "metric": "one of {fields}" | null,
+    "aggregation": "string" | null,
+    "analysis": "string" | null,
+    "time_range": "string" | null,
+    "service": "vehicle_service" | null
     }}
     """
 
     response = llm.generate(prompt_1)
 
+    logger.info(f"Raw LLM Response: {response}")
+
     # Extract JSON block
+    # json_match = re.search(r"\{.*\}", response, re.DOTALL)
     json_match = re.search(r"\{.*\}", response, re.DOTALL)
-    # json_match = re.search(r"\{.*?\}", response, re.DOTALL)
 
     if not json_match:
+        logger.error(f"No JSON found. Raw response: {response}")
         raise ValueError("No JSON found in LLM response")
 
     json_str = json_match.group()

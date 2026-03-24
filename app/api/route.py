@@ -26,7 +26,7 @@ def query_system(data: QueryRequest):
 
     result = route_tool(plan)
     
-    logger.info(f"Result: {result}")
+    logger.info(f"Final result before validation: {result}, type: {type(result)}")
     
     validate_result(result)
 
