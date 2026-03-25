@@ -63,7 +63,7 @@ STYLE RULES:
 - No extra text
 - No labels like "Answer:"
 - No assumptions
-- Use natural phrasing (e.g., "currently", "recorded", "is")
+- Use natural phrasing
 
 --------------------------------------------------
 METRIC UNITS:

@@ -15,7 +15,14 @@ router = APIRouter()
 @router.post("/query")
 def query_system(data: QueryRequest):
 
+    if not data.query:
+        return {
+            "response": "Please provide query."
+        }
+
     intent = extract_intent(data.query)
+
+    logger.info(f"Intent: {intent}")
 
     if not validate_intent(intent):
         return {
