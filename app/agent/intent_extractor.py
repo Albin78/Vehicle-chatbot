@@ -173,7 +173,83 @@ OUTPUT FORMAT:
 }}
 """
 
-    response = llm.generate(prompt_2)
+
+    prompt_3 = f"""
+You are a machine system that extracts structured intent for a Vehicle Monitoring System (VMS).
+
+Your output MUST be a valid JSON object.
+
+--------------------------------------------------
+INPUT:
+Query: {query}
+
+Available Metrics:
+{fields}
+
+--------------------------------------------------
+TASK:
+
+Extract intent fields from the query.
+
+--------------------------------------------------
+RULES:
+
+1. DOMAIN FILTER:
+If query is NOT related to:
+- vehicle
+- telemetry
+- IMEI
+- vehicle data
+
+Then return:
+{{
+  "metric": null,
+  "aggregation": null,
+  "analysis": null,
+  "time_range": null,
+  "service": null
+}}
+
+2. IMEI EXTRACTION:
+- Extract IMEI ONLY if it is a 15-digit number
+- If not found → imei = null
+- DO NOT guess IMEI
+
+
+3. SERVICE:
+- If query asks vehicle metadata (company, model, plate, etc.)
+  → "vehicle_service"
+- Else → null
+
+4. AGGREGATION:
+- avg, mean → "average"
+- max → "maximum"
+- min → "minimum"
+- Else → null
+
+5. STRICT OUTPUT FORMAT:
+
+- Output MUST be in valid JSON format
+- NO explanation
+- NO extra text
+- NO multiple JSON objects
+- NO markdown
+
+--------------------------------------------------
+
+OUTPUT FORMAT:
+
+{{
+  "imei": "15-digit string | null",
+  "metric": "string | null",
+  "aggregation": "string | null",
+  "analysis": "string | null",
+  "time_range": "string | null",
+  "service": "vehicle_service | null"
+}}
+"""
+
+    response = llm.generate(prompt_3)
 
     logger.info(f"Raw LLM Response: {response}")
 

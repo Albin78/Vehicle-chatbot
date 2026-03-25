@@ -6,4 +6,4 @@ class QueryRequest(BaseModel):
 
     query: str
 
-    imei: Optional[str]
+    # imei: Optional[str]

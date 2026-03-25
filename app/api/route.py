@@ -29,7 +29,7 @@ def query_system(data: QueryRequest):
              "response": "I am a VMS chatbot, I am unable to answer the question."
         }
 
-    plan = create_plan(intent, data.imei)
+    plan = create_plan(intent)
 
     result = route_tool(plan)
     
@@ -37,7 +37,7 @@ def query_system(data: QueryRequest):
     
     validate_result(result)
 
-    response = generate_response(data.query, result)
+    response = generate_response(data.query, result, intent)
     
     logger.info(f"Response: {response}")
 

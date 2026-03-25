@@ -40,6 +40,7 @@
 
 # print(response.text)
 
-from app.config import settings
+# from app.config import settings
 
-print(settings.BATTERY_API_URL)
+# print(settings.BATTERY_API_URL)
+
