@@ -53,8 +53,8 @@ Return ONLY valid JSON.
 }}
 """
 
-    prompt_optimized = f"""
-You are a STRICT structured intent extraction system for a Vehicle Monitoring System (VMS).
+    prompt_final = f"""
+You are a STRICT and deterministic intent extraction system for a Vehicle Monitoring System (VMS).
 
 Your output MUST be a valid JSON object.
 
@@ -62,176 +62,130 @@ Your output MUST be a valid JSON object.
 INPUT:
 Query: {query}
 
-Available Metrics:
+Available Metrics (STRICT LIST):
 {fields}
 
 --------------------------------------------------
-CORE PRINCIPLE:
+CORE DEFINITIONS:
 
-- IMEI is an IDENTIFIER (15-digit number)
-- Metrics are TELEMETRY fields (speed, batteryLevel, etc.)
-- IMEI and metric are COMPLETELY DIFFERENT
-- IMEI MUST NEVER be treated as a metric
-
---------------------------------------------------
-TASK:
-
-Extract the following fields from the query:
-- imei
-- metric
-- aggregation
-- analysis
-- time_range
-- service
+- IMEI → a 15-digit IDENTIFIER (NOT a metric)
+- Metrics → telemetry fields ONLY from the provided list
+- Service → vehicle metadata or vehicle information requests
 
 --------------------------------------------------
-RULES:
+CRITICAL GLOBAL RULES:
 
-1. DOMAIN FILTER (STRICT):
-If query is NOT related to:
-- vehicle
-- telemetry
-- IMEI
-- vehicle data
-
-Return:
-{{
-  "imei": null,
-  "metric": null,
-  "aggregation": null,
-  "analysis": null,
-  "time_range": null,
-  "service": null
-}}
-
---------------------------------------------------
-2. IMEI EXTRACTION (HIGHEST PRIORITY):
-
-- Extract ONLY if there is a 15-digit number
-- If multiple 15-digit numbers exist → extract the FIRST one
-- If none → imei = null
-- DO NOT guess or modify IMEI
+- NEVER guess metric
+- NEVER hallucinate values
+- If unsure about a field → return null
+- Fields must be extracted independently
 
 IMPORTANT:
-- IMEI MUST NOT influence metric extraction
+- LIMITED semantic understanding is allowed ONLY for SERVICE detection
 
 --------------------------------------------------
-3. METRIC EXTRACTION (STRICT):
-
-- Extract metric ONLY if explicitly mentioned
-- Metric MUST be one of: {fields}
-- DO NOT infer from IMEI or numbers
-
-IMPORTANT NEGATIVE RULE:
-- A 15-digit number (IMEI) is NOT a metric
-- DO NOT map IMEI to any metric like "Device"
-
-If metric is not clearly mentioned:
-→ metric = null
+FIELD EXTRACTION RULES:
 
 --------------------------------------------------
-4. SERVICE RULE:
+1. IMEI (HIGHEST PRIORITY)
 
-- If query asks vehicle metadata (company, model, plate, etc.)
-  → service = "vehicle_service"
+- Extract ONLY a 15-digit number
+- If multiple → take FIRST
+- If none → null
+
+IMPORTANT:
+- IMEI MUST NOT influence metric
+
+--------------------------------------------------
+2. SERVICE (INTENT DETECTION - ALLOWED SEMANTIC MATCHING)
+
+Set service = "vehicle_service" IF query contains intent like:
+
+- vehicle details
+- vehicle information
+- fetch vehicle
+- vehicle data
+- details of vehicle
+- vehicle info
+- metadata
+- company, model, plate, make
+
+IMPORTANT:
+- This does NOT require exact keyword match
+- Semantic meaning is enough
+
+Examples:
+- "Fetch vehicle details" → vehicle_service
+- "Get details for imei" → vehicle_service
+- "Show vehicle info" → vehicle_service
+
+Otherwise:
+→ service = null
+
+--------------------------------------------------
+3. METRIC (STRICT CONTROL)
+
+- Metric MUST be EXACTLY one of:
+{fields}
+
+STRICT RULES:
+- ONLY extract if explicitly mentioned
+- DO NOT infer
+- DO NOT use IMEI
+- DO NOT guess
+
+STRICT NEGATIVE:
+- "imei" is NOT a metric
+- If not clearly present → metric = null
+
+OVERRIDE RULE:
+- If service = "vehicle_service"
   → metric MUST be null
 
-- Otherwise:
-  → service = null
-
 --------------------------------------------------
-5. AGGREGATION RULE:
+4. AGGREGATION
 
 - avg, mean → "average"
 - max → "maximum"
 - min → "minimum"
+
+STRICT:
+- ONLY if explicitly present
 - Else → null
 
 --------------------------------------------------
-6. STRICT OUTPUT RULE:
+5. ANALYSIS
+
+- Extract ONLY if explicitly mentioned
+- Else → null
+
+--------------------------------------------------
+6. TIME RANGE
+
+- today → "today"
+- yesterday → "yesterday"
+- last week → "last_week"
+
+STRICT:
+- ONLY if explicitly mentioned
+- Else → null
+
+--------------------------------------------------
+FINAL VALIDATION (MANDATORY):
+
+Before output:
+
+- metric must be from {fields} or null
+- metric must NOT be "imei"
+- if service = "vehicle_service" → metric = null
+- no field should contain guessed values
+
+--------------------------------------------------
+OUTPUT RULES:
 
 - Return EXACTLY ONE JSON object
 - NO explanation
-- NO text before JSON
-- NO text after JSON
-- NO markdown
-- NO comments
-
---------------------------------------------------
-
-OUTPUT FORMAT:
-
-{{
-  "imei": "15-digit string | null",
-  "metric": "string | null",
-  "aggregation": "string | null",
-  "analysis": "string | null",
-  "time_range": "string | null",
-  "service": "vehicle_service | null"
-}}
-"""
-
-
-
-    prompt_3 = f"""
-You are a machine system that extracts structured intent for a Vehicle Monitoring System (VMS).
-
-Your output MUST be a valid JSON object.
-
---------------------------------------------------
-INPUT:
-Query: {query}
-
-Available Metrics:
-{fields}
-
---------------------------------------------------
-TASK:
-
-Extract intent fields from the query.
-
---------------------------------------------------
-RULES:
-
-1. DOMAIN FILTER:
-If query is NOT related to:
-- vehicle
-- telemetry
-- IMEI
-- vehicle data
-
-Then return:
-{{
-  "metric": null,
-  "aggregation": null,
-  "analysis": null,
-  "time_range": null,
-  "service": null
-}}
-
-2. IMEI EXTRACTION:
-- Extract IMEI ONLY if it is a 15-digit number
-- If not found → imei = null
-- DO NOT guess IMEI
-
-
-3. SERVICE:
-- If query asks vehicle metadata (company, model, plate, etc.)
-  → "vehicle_service"
-- Else → null
-
-4. AGGREGATION:
-- avg, mean → "average"
-- max → "maximum"
-- min → "minimum"
-- Else → null
-
-5. STRICT OUTPUT FORMAT:
-
-- Output MUST be in valid JSON format
-- NO explanation
 - NO extra text
-- NO multiple JSON objects
 - NO markdown
 
 --------------------------------------------------
@@ -240,15 +194,15 @@ OUTPUT FORMAT:
 
 {{
   "imei": "15-digit string | null",
-  "metric": "string | null",
-  "aggregation": "string | null",
+  "metric": "one of {fields} or null",
+  "aggregation": "average | maximum | minimum | null",
   "analysis": "string | null",
-  "time_range": "string | null",
+  "time_range": "today | yesterday | last_week | null",
   "service": "vehicle_service | null"
 }}
 """
 
-    response = llm.generate(prompt_optimized)
+    response = llm.generate(prompt_final)
 
     logger.info(f"Raw LLM Response: {response}")
 

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     OLLAMA_URL: str
     BATTERY_API_URL: str
     BATTERY_API_TOKEN: str
+    VEHICLE_API_URL: str
 
     model_config = {
         "env_file": f".env.{ENV}"

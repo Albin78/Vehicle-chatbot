@@ -1,17 +1,18 @@
 import requests
+from typing_extensions import Optional
 from app.utils.logger import logger
 from app.config import settings
 
-BASE_URL = settings.BATTERY_API_URL
+BASE_URL = settings.VEHICLE_API_URL
 AUTH_TOKEN = settings.BATTERY_API_TOKEN
 
 
 
-def get_vehicle_details(imei: str):
+def get_vehicle_details(imei: str, company_id: Optional[int]=206):
 
     try:
-        if not imei:
-            return {"response": "IMEI is required"}
+        if not company_id:
+            return {"response": "Company ID is required"}
 
         headers = {
             "Authorization": f"Bearer {AUTH_TOKEN}",
@@ -19,9 +20,10 @@ def get_vehicle_details(imei: str):
             "User-Agent": "MyUserAgent"
         }
 
-        params = {"IMEI": imei}
+        # params = {"IMEI": imei}
+        params = {"cid": company_id}
 
-        logger.info(f"Calling Vehicle API: {BASE_URL} with IMEI: {imei}")
+        logger.info(f"Calling Vehicle API: {BASE_URL} with cid: {company_id}")
 
         response = requests.get(
             BASE_URL,
