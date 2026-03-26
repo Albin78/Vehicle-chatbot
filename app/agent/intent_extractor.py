@@ -53,106 +53,103 @@ Return ONLY valid JSON.
 }}
 """
 
-    prompt_1 = f"""
-    You are a STRICT intent extraction system for a Vehicle Monitoring System (VMS).
+    prompt_optimized = f"""
+You are a STRICT structured intent extraction system for a Vehicle Monitoring System (VMS).
 
-    Query: {query}
+Your output MUST be a valid JSON object.
 
-    Available telemetry metrics:
-    {fields}
-
-    Your job:
-    - Extract telemetry intent if the query is about sensor data
-    - Identify if the query is about vehicle details
-    
-    1. DOMAIN CHECK (MANDATORY):
-    - The query MUST be related to vehicle telemetry or vehicle details.
-    - If the query is NOT related to vehicles, telemetry, or IMEI:
-    → Return ALL fields as null.
-
-    2. METRIC EXTRACTION RULE:
-    - Extract metric ONLY if explicitly mentioned or clearly implied.
-    - DO NOT guess or infer unrelated metrics.
-
-    Rules:
-    - If query is about telemetry (battery, voltage, speed, etc.) → service = null
-    - If query asks for vehicle details, or metadata → service = "vehicle_service"
-    - Do NOT invent information
-
-    Aggregation mapping:
-    average, mean, avg → "average"
-    max, highest → "maximum"
-    min, lowest → "minimum"
-    
-    Return ONLY JSON.
-    Do NOT include explanation.
-    Do NOT include markdown.
-    Do NOT include multiple JSON objects.
-
-    {{
-    "metric": "one of {fields}" | null,
-    "aggregation": "string" | null,
-    "analysis": "string" | null,
-    "time_range": "string" | null,
-    "service": "vehicle_service" | null
-    }}
-    """
-
-    prompt_2 = f"""
-You are a STRICT intent extraction system for a Vehicle Monitoring System (VMS).
-
+--------------------------------------------------
+INPUT:
 Query: {query}
 
-Available telemetry metrics:
+Available Metrics:
 {fields}
 
 --------------------------------------------------
-STRICT INSTRUCTIONS:
+CORE PRINCIPLE:
 
-1. DOMAIN CHECK (MANDATORY):
-- The query MUST be related to vehicle telemetry or vehicle details.
-- If the query is NOT related to vehicles, telemetry, or IMEI:
-  → Return ALL fields as null.
-
-Examples of OUT-OF-SCOPE:
-- mobile phones, prices, news, sports, general knowledge
-- If unsure → return null for everything
+- IMEI is an IDENTIFIER (15-digit number)
+- Metrics are TELEMETRY fields (speed, batteryLevel, etc.)
+- IMEI and metric are COMPLETELY DIFFERENT
+- IMEI MUST NEVER be treated as a metric
 
 --------------------------------------------------
-2. METRIC EXTRACTION RULE:
+TASK:
 
-- Extract metric ONLY if explicitly mentioned or clearly implied.
-- DO NOT guess or infer unrelated metrics.
+Extract the following fields from the query:
+- imei
+- metric
+- aggregation
+- analysis
+- time_range
+- service
 
-Valid mappings:
-- "speed" → speed
-- "battery", "voltage" → batteryLevel
-- "rpm" → engineRpm
-- "temperature" → engineTemperature
+--------------------------------------------------
+RULES:
 
-If metric is not clearly present:
+1. DOMAIN FILTER (STRICT):
+If query is NOT related to:
+- vehicle
+- telemetry
+- IMEI
+- vehicle data
+
+Return:
+{{
+  "imei": null,
+  "metric": null,
+  "aggregation": null,
+  "analysis": null,
+  "time_range": null,
+  "service": null
+}}
+
+--------------------------------------------------
+2. IMEI EXTRACTION (HIGHEST PRIORITY):
+
+- Extract ONLY if there is a 15-digit number
+- If multiple 15-digit numbers exist → extract the FIRST one
+- If none → imei = null
+- DO NOT guess or modify IMEI
+
+IMPORTANT:
+- IMEI MUST NOT influence metric extraction
+
+--------------------------------------------------
+3. METRIC EXTRACTION (STRICT):
+
+- Extract metric ONLY if explicitly mentioned
+- Metric MUST be one of: {fields}
+- DO NOT infer from IMEI or numbers
+
+IMPORTANT NEGATIVE RULE:
+- A 15-digit number (IMEI) is NOT a metric
+- DO NOT map IMEI to any metric like "Device"
+
+If metric is not clearly mentioned:
 → metric = null
 
 --------------------------------------------------
-3. VEHICLE DETAILS RULE:
+4. SERVICE RULE:
 
-- If query asks about vehicle metadata or specifically vehicle details not telemetry or analysis
+- If query asks vehicle metadata (company, model, plate, etc.)
   → service = "vehicle_service"
+  → metric MUST be null
 
 - Otherwise:
   → service = null
 
 --------------------------------------------------
-4. AGGREGATION RULE:
+5. AGGREGATION RULE:
 
-- average, mean, avg → "average"
-- max, highest → "maximum"
-- min, lowest → "minimum"
-
-If not present → null
+- avg, mean → "average"
+- max → "maximum"
+- min → "minimum"
+- Else → null
 
 --------------------------------------------------
-5. OUTPUT RULE (CRITICAL):
+6. STRICT OUTPUT RULE:
+
 - Return EXACTLY ONE JSON object
 - NO explanation
 - NO text before JSON
@@ -165,13 +162,15 @@ If not present → null
 OUTPUT FORMAT:
 
 {{
-  "metric": "one of {fields}" | null,
-  "aggregation": "string" | null,
-  "analysis": "string" | null,
-  "time_range": "string" | null,
-  "service": "vehicle_service" | null
+  "imei": "15-digit string | null",
+  "metric": "string | null",
+  "aggregation": "string | null",
+  "analysis": "string | null",
+  "time_range": "string | null",
+  "service": "vehicle_service | null"
 }}
 """
+
 
 
     prompt_3 = f"""
@@ -249,7 +248,7 @@ OUTPUT FORMAT:
 }}
 """
 
-    response = llm.generate(prompt_3)
+    response = llm.generate(prompt_optimized)
 
     logger.info(f"Raw LLM Response: {response}")
 

@@ -44,3 +44,6 @@
 
 # print(settings.BATTERY_API_URL)
 
+
+import sys
+print(sys.executable)

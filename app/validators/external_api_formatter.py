@@ -1,3 +1,5 @@
+import re
+
 def data_formatter(result: dict):
     
     if isinstance(result, dict):
@@ -20,3 +22,8 @@ def data_formatter(result: dict):
     • SIMcard number: {vehicle.get("SimcardNumber")}
     • Manufacture Serial Number: {vehicle.get("ManufactureSerialNo")}
 """
+    
+
+def extract_imei_from_query(query: str):
+    match = re.search(r"\b\d{15}\b", query)
+    return match.group() if match else None

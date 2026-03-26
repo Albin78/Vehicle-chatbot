@@ -13,3 +13,4 @@ def validate_intent(intent):
         return False
 
     return True
+

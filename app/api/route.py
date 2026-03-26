@@ -7,6 +7,7 @@ from app.router.tool_router import route_tool
 from app.validators.result_validator import validate_result
 from app.agent.response_generator import generate_response
 from app.validators.intent_validation import validate_intent
+from app.validators.external_api_formatter import extract_imei_from_query
 from app.utils.logger import logger
 
 router = APIRouter()
@@ -28,8 +29,10 @@ def query_system(data: QueryRequest):
         return {
              "response": "I am a VMS chatbot, I am unable to answer the question."
         }
+    
+    imei = extract_imei_from_query(data.query)
 
-    plan = create_plan(intent)
+    plan = create_plan(intent, imei)
 
     result = route_tool(plan)
     
