@@ -1,7 +1,8 @@
 import requests
-from typing_extensions import Optional
+from typing_extensions import Optional, Any
 from app.utils.logger import logger
 from app.config import settings
+
 
 BASE_URL = settings.VEHICLE_API_URL
 AUTH_TOKEN = settings.BATTERY_API_TOKEN
@@ -82,12 +83,13 @@ def get_vehicle_details(imei: Optional[str]=None, company_id: Optional[int]=16):
 
 
 
-def get_vehicle_by_imei(api_response: dict, imei: Optional[str]):
+def get_vehicle_by_imei(api_response:dict[str, Any], imei: Optional[str]):
     vehicle_list = api_response.get("VehicleList", [])
     logger.info(f"Vehicle list fetched: {vehicle_list}")
     
     # Build map (can cache this)
     vehicle_map = {v["IMEI"]: v for v in vehicle_list}
+
     logger.info(f"Vehicle Map: {vehicle_map}")
     
     return vehicle_map.get(imei)

@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from typing import  Any
 
 def validate_result(result):
 
@@ -9,6 +10,13 @@ def validate_result(result):
         )
     
 
-def validate_aapi_response(api_response):
+def validate_api_response(api_response: dict[str, Any] | None) -> dict[str, Any]:
     if not api_response:
-        return "This imei not seems under the given company id"
+        return {
+            "type": "error",
+            "message": "Invalid IMEI for this company"
+        }
+    return {
+        "type": "vehicle_data",
+        "data": api_response
+    }
