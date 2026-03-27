@@ -15,6 +15,10 @@ def get_db_fields():
 
     sample = collection.find_one()
 
+    if sample is None:
+        logger.warning("No documents found in collection")
+        return []
+
     excluded = {"_id", "imei", "date", "sensor"}
 
     fields = [k for k in sample.keys() if k not in excluded]
@@ -70,129 +74,130 @@ CORE DEFINITIONS:
 
 - IMEI → a 15-digit IDENTIFIER (NOT a metric)
 - Metrics → telemetry fields ONLY from the provided list
-- Service → vehicle metadata or vehicle information requests
+- Service → vehicle metadata requests (READ ONLY)
+- Action → operation requested by user
 
 --------------------------------------------------
-CRITICAL GLOBAL RULES:
+CRITICAL RULE:
 
-- NEVER guess metric
-- NEVER hallucinate values
-- If unsure about a field → return null
-- Fields must be extracted independently
+ACTION detection OVERRIDES everything.
+
+--------------------------------------------------
+FIELD EXTRACTION:
+
+--------------------------------------------------
+1. ACTION (HIGHEST PRIORITY)
+
+Detect user intent:
+
+- delete, remove → "delete"
+- update, modify, change → "update"
+- fetch, get, show, retrieve → "fetch"
+
+If none → "fetch" (default safe read)
 
 IMPORTANT:
-- LIMITED semantic understanding is allowed ONLY for SERVICE detection
+- If action = delete or update:
+  → service MUST be null
+  → metric MUST be null
 
 --------------------------------------------------
-FIELD EXTRACTION RULES:
+2. IMEI
 
---------------------------------------------------
-1. IMEI (HIGHEST PRIORITY)
-
-- Extract ONLY a 15-digit number
+- Extract ONLY 15-digit number
 - If multiple → take FIRST
-- If none → null
-
-IMPORTANT:
-- IMEI MUST NOT influence metric
+- Else → null
 
 --------------------------------------------------
-2. SERVICE (INTENT DETECTION - ALLOWED SEMANTIC MATCHING)
+3. SERVICE (ONLY FOR READ QUERIES)
 
-Set service = "vehicle_service" IF query contains intent like:
+Apply ONLY if:
+- action = "fetch"
 
+AND query asks for:
 - vehicle details
 - vehicle information
-- fetch vehicle
 - vehicle data
-- details of vehicle
-- vehicle info
 - metadata
 - company, model, plate, make
 
+Then:
+→ service = "vehicle_service"
+
+Else:
+→ null
+
 IMPORTANT:
-- This does NOT require exact keyword match
-- Semantic meaning is enough
-
-Examples:
-- "Fetch vehicle details" → vehicle_service
-- "Get details for imei" → vehicle_service
-- "Show vehicle info" → vehicle_service
-
-Otherwise:
-→ service = null
+- If action != fetch → service MUST be null
 
 --------------------------------------------------
-3. METRIC (STRICT CONTROL)
+4. METRIC (STRICT)
 
-- Metric MUST be EXACTLY one of:
+- Must be EXACTLY from:
 {fields}
 
-STRICT RULES:
+Rules:
 - ONLY extract if explicitly mentioned
 - DO NOT infer
-- DO NOT use IMEI
+- DO NOT map IMEI
 - DO NOT guess
 
 STRICT NEGATIVE:
 - "imei" is NOT a metric
-- If not clearly present → metric = null
+- "device" is NOT a metric UNLESS explicitly mentioned in query
 
-OVERRIDE RULE:
-- If service = "vehicle_service"
-  → metric MUST be null
+OVERRIDE:
+- If service = "vehicle_service" → metric = null
+- If action != "fetch" → metric = null
 
 --------------------------------------------------
-4. AGGREGATION
+5. AGGREGATION
 
-- avg, mean → "average"
+- avg → "average"
 - max → "maximum"
 - min → "minimum"
 
-STRICT:
-- ONLY if explicitly present
-- Else → null
+Else → null
+
+Only if metric exists
 
 --------------------------------------------------
-5. ANALYSIS
+6. ANALYSIS
 
 - Extract ONLY if explicitly mentioned
-- Else → null
+Else → null
 
 --------------------------------------------------
-6. TIME RANGE
+7. TIME RANGE
 
-- today → "today"
-- yesterday → "yesterday"
-- last week → "last_week"
+- today, yesterday, last week
 
-STRICT:
-- ONLY if explicitly mentioned
-- Else → null
+Else → null
 
 --------------------------------------------------
-FINAL VALIDATION (MANDATORY):
+FINAL VALIDATION (STRICT):
 
-Before output:
+- If action != "fetch":
+    metric = null
+    service = null
 
 - metric must be from {fields} or null
-- metric must NOT be "imei"
-- if service = "vehicle_service" → metric = null
-- no field should contain guessed values
+- metric MUST NOT be "imei"
+- metric MUST NOT be inferred
 
 --------------------------------------------------
 OUTPUT RULES:
 
-- Return EXACTLY ONE JSON object
+- ONLY JSON
 - NO explanation
 - NO extra text
-- NO markdown
 
 --------------------------------------------------
 
 OUTPUT FORMAT:
 
 {{
+  "action": "fetch | delete | update",
   "imei": "15-digit string | null",
   "metric": "one of {fields} or null",
   "aggregation": "average | maximum | minimum | null",
@@ -201,6 +206,7 @@ OUTPUT FORMAT:
   "service": "vehicle_service | null"
 }}
 """
+
 
     response = llm.generate(prompt_final)
 

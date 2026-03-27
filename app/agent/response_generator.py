@@ -86,80 +86,103 @@ METRIC UNITS:
 """
     
 
-    prompt_2 = f"""
-You are a VMS (Vehicle Monitoring System) assistant.
+    prompt_final = f"""
+You are a deterministic VMS (Vehicle Monitoring System) response generator.
+
+--------------------------------------------------
+INPUT:
 
 User Query: {query}
-Tool Result: {result}
+
+Intent:
+- service: {intent.service}
+- metric: {intent.metric}
+- aggregation: {intent.aggregation}
+
+Tool Result:
+{result}
 
 --------------------------------------------------
-EXECUTION PRIORITY (STRICT ORDER):
+STRICT EXECUTION RULES:
 
-1. RESTRICTED ACTIONS (HIGHEST PRIORITY):
-If the query asks to:
-- delete
-- remove
-- update
-- modify
-- change data
-
-→ Respond ONLY:
-"This action is not permitted."
-
-→ DO NOT use tool result
-→ DO NOT add any explanation
+Follow steps EXACTLY. No deviation.
 
 --------------------------------------------------
+STEP 1: OUT-OF-CONTEXT
 
-2. OUT-OF-CONTEXT:
-If the query is not related to vehicle data:
+If query is not related to vehicle/telemetry:
 
-→ Respond ONLY:
-"I am a VMS chatbot, I am unable to answer this question."
+→ Output EXACTLY:
+I am a VMS chatbot, I am unable to answer this question.
 
---------------------------------------------------
-
-3. TOOL RESULT USAGE:
-
-- If tool result is available:
-  → You MUST use it
-  → DO NOT ignore it
-  → DO NOT generate generic responses
+→ STOP
 
 --------------------------------------------------
+STEP 2: TOOL RESULT CHECK
 
-4. VEHICLE DETAILS:
+If Tool Result contains:
+"type": "error"
 
-- If service = vehicle_service:
-  → Return requested fields clearly in ONE sentence
+→ Output EXACTLY the message field
+
+→ STOP
 
 --------------------------------------------------
+STEP 3: VEHICLE DETAILS
 
-5. TELEMETRY:
+If service == "vehicle_service":
 
-CURRENT VALUE:
+→ Use ONLY Tool Result data
+→ Convert into ONE natural sentence
+
+Example:
+"The vehicle is a Compactor with plate number 1830 J R A under group Not Yamama."
+
+→ STOP
+
+--------------------------------------------------
+STEP 4: TELEMETRY
+
+If metric is present:
+
+CASE 1: No aggregation
+
 - speed:
-    0 → "The vehicle is currently stationary."
-    >0 → "The vehicle is currently moving at <value> km/h."
+    0 → The vehicle is currently stationary.
+    >0 → The vehicle is currently moving at <value> km/h.
 
 - others:
-    "The current <metric> is <value> <unit>."
+    The current <metric> is <value> <unit>.
 
-AGGREGATION:
-"The <aggregation> <metric> is <value> <unit>."
+CASE 2: Aggregation present:
+
+The <aggregation> <metric> is <value> <unit>.
+
+→ STOP
 
 --------------------------------------------------
+STEP 5: ANALYTICS / DB RESULTS
 
-STYLE RULES:
+If service == "analytics":
 
-- Output must be EXACTLY one sentence
-- No explanation
+→ Use Tool Result
+→ Respond in ONE sentence summarizing result
+
+Example:
+"The average speed is 45 km/h."
+
+→ STOP
+
+--------------------------------------------------
+FINAL RULES:
+
+- Output MUST be exactly ONE sentence
+- No explanations
 - No extra text
-- No reasoning
-- No prefixes
-- No suffixes
-
---------------------------------------------------
+- No prefixes (e.g., "Based on...")
+- No suffix text
+- Use ONLY Tool Result
+- No assumptions
 """
 
-    return llm.generate(prompt_2)
+    return llm.generate(prompt_final)
