@@ -8,7 +8,7 @@ AUTH_TOKEN = settings.BATTERY_API_TOKEN
 
 
 
-def get_vehicle_details(imei: str, company_id: Optional[int]=206):
+def get_vehicle_details(imei: Optional[str]=None, company_id: Optional[int]=16):
 
     try:
         if not company_id:
@@ -42,8 +42,10 @@ def get_vehicle_details(imei: str, company_id: Optional[int]=206):
             }
 
         data = response.json()
+        vehicle_count = data.get("VehicleCount", [])
 
         logger.info(f"API Response: {data}")
+        logger.info(f"Total Vehicle Count: {vehicle_count[0].get('TotalCount', 0)}")
 
         # HANDLE API-LEVEL FAILURE
         if not data.get("success", True):
@@ -78,3 +80,14 @@ def get_vehicle_details(imei: str, company_id: Optional[int]=206):
             "response": "Some internal error happened"
         }
 
+
+
+def get_vehicle_by_imei(api_response: dict, imei: Optional[str]):
+    vehicle_list = api_response.get("VehicleList", [])
+    logger.info(f"Vehicle list fetched: {vehicle_list}")
+    
+    # Build map (can cache this)
+    vehicle_map = {v["IMEI"]: v for v in vehicle_list}
+    logger.info(f"Vehicle Map: {vehicle_map}")
+    
+    return vehicle_map.get(imei)

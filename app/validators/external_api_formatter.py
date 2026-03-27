@@ -1,9 +1,10 @@
 import re
+from typing import Optional
 
-def data_formatter(result: dict):
-    
-    if isinstance(result, dict):
-        vehicle = result.get("data", {})
+def data_formatter(result: Optional[list[dict]]):
+
+    if isinstance(result, list):
+        vehicle = result[0].get("VehicleList", {})
         if not vehicle:
             return "Sorry, I couldn't fetch vehicle details."
 
