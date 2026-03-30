@@ -9,7 +9,7 @@ def validate_result(result):
         logger.info("Inside the validate result function")
         return {
             "type": "error",
-            "message": "Result not found for this IMEI"
+            "message": "Result not found for this IMEI. The data for this IMEI does not exist in the database. Please check if IMEI provided is valid or IMEI is missing in query."
         }
     return {
         "type": "Result data",

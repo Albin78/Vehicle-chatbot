@@ -58,9 +58,9 @@ Return ONLY valid JSON.
 """
 
     prompt_final = f"""
-You are a STRICT deterministic intent extraction system for a Vehicle Monitoring System (VMS).
+You are a STRICT rule-based intent extraction engine for a Vehicle Monitoring System (VMS).
 
-Your output MUST be a valid JSON object.
+You MUST behave like a deterministic system. DO NOT infer, guess, or complete missing information.
 
 --------------------------------------------------
 INPUT:
@@ -70,135 +70,138 @@ Available Metrics (STRICT LIST):
 {fields}
 
 --------------------------------------------------
-CORE DEFINITIONS:
+STEP 0 — QUERY CLASSIFICATION (MANDATORY FIRST STEP)
 
-- IMEI → 15-digit identifier (NOT a metric)
-- Metric → telemetry field from provided list ONLY
-- Aggregation → operation on metric
-- Service → vehicle metadata request
-- Action → user operation
+Classify the query into ONE of the following:
 
---------------------------------------------------
-FIELD EXTRACTION ORDER (STRICT):
+1. TELEMETRY_QUERY
+   → Requires IMEI + metric
+   Example:
+   "What is speed of imei 123456789012345"
 
-1. ACTION
-2. IMEI
-3. AGGREGATION
-4. METRIC
-5. SERVICE
-6. TIME RANGE
-7. ANALYSIS
+2. SERVICE_QUERY
+   → Explicit request for vehicle metadata
+   Example:
+   "Get vehicle details for imei 123456789012345"
 
---------------------------------------------------
-1. ACTION (STRICT – NO GUESSING)
-
-Determine action ONLY using explicit keywords from the query.
-
-DELETE:
-- Trigger ONLY if query contains EXACT words:
-  "delete", "remove", "erase"
-
-UPDATE:
-- Trigger ONLY if query contains EXACT words:
-  "update", "modify", "change"
-
-FETCH:
-- Trigger if query contains:
-  "get", "fetch", "show", "retrieve", "what", "list"
-
-  
-DEFAULT:
-- If NONE of the above keywords are present:
-  → action = "fetch"
-
-
-CRITICAL RULES:
-- DO NOT infer action
-- DO NOT assume intent
-- DO NOT use context outside the query
-- If "delete" keyword is NOT present → action MUST NOT be "delete"
-- If "update" keyword is NOT present → action MUST NOT be "update"
-
-If action != "fetch":
-→ metric = null
-→ aggregation = null
-→ service = null
+3. INVALID_QUERY
+   → Missing IMEI OR ambiguous OR generic question
+   Examples:
+   ❌ "What is speed of Land Cruiser"
+   ❌ "Average speed of vehicle"
+   ❌ "Tell me about cars"
 
 --------------------------------------------------
-2. IMEI
+CRITICAL RULE:
+
+IF query is INVALID_QUERY:
+→ RETURN all fields as null (except action)
+
+DO NOT attempt extraction
+
+--------------------------------------------------
+STEP 1 — ACTION
+
+- "delete", "remove", "erase" → delete
+- "update", "modify", "change" → update
+- "get", "fetch", "show", "retrieve", "what", "list" → fetch
+- Default → fetch
+
+--------------------------------------------------
+STEP 2 — IMEI
 
 - Extract ONLY 15-digit number
-- If multiple → take FIRST
 - Else → null
 
 --------------------------------------------------
-3. AGGREGATION (HIGH PRIORITY)
+STEP 3 — TELEMETRY GATING (CRITICAL)
 
-Mappings:
+IF IMEI is null:
+→ metric = null
+→ aggregation = null
+
+DO NOT extract metric or aggregation without IMEI
+
+--------------------------------------------------
+STEP 4 — AGGREGATION
 
 - average, avg, mean → "average"
 - maximum, max, highest → "maximum"
 - minimum, min, lowest → "minimum"
-
-RULES:
-- If keyword exists → MUST extract
-- Case insensitive
 - Else → null
 
 --------------------------------------------------
-4. METRIC
+STEP 5 — METRIC
 
-- Must be EXACT match from:
-{fields}
+- Extract ONLY if:
+    1. IMEI exists
+    2. Exact match from list
 
-RULES:
-- Extract ONLY if explicitly mentioned
 - DO NOT infer
 - DO NOT guess
-- DO NOT map IMEI
-
-STRICT:
-- "imei" is NOT a metric
-- "device" only if explicitly present
 
 --------------------------------------------------
-5. SERVICE
+STEP 6 — SERVICE (STRICT)
 
-Apply ONLY IF:
-- action = "fetch"
-- metric = null
-- aggregation = null
+SERVICE = "vehicle_service" ONLY IF:
 
-AND query asks for:
-- vehicle details
-- vehicle information
-- metadata
+ALL conditions TRUE:
+1. action = fetch
+2. metric = null
+3. aggregation = null
+4. IMEI exists
+5. Query contains EXACT phrases:
+   - "vehicle details"
+   - "vehicle info"
+   - "vehicle information"
+   - "vehicle metadata"
 
-Then:
-→ "vehicle_service"
-
-Else → null
+ELSE:
+→ service = null
 
 --------------------------------------------------
-6. TIME RANGE
+STRICT PROHIBITIONS:
+
+❌ DO NOT assign service for:
+- "vehicle", "car", "truck"
+- vehicle names (e.g., Land Cruiser)
+- generic queries
+
+--------------------------------------------------
+STEP 7 — TIME RANGE
 
 - today, yesterday, last week
 Else → null
 
 --------------------------------------------------
-7. ANALYSIS
+STEP 8 — ANALYSIS
 
 - Only if explicitly present
 Else → null
 
 --------------------------------------------------
-FINAL VALIDATION (STRICT):
+FINAL HARD VALIDATION (MANDATORY)
 
-- If aggregation != null → metric MUST NOT be null
-- If metric != null → service MUST be null
-- If service != null → metric = null AND aggregation = null
-- IMEI must NOT affect metric
-- NO guessing
+1. If IMEI is null:
+   → metric = null
+   → aggregation = null
+
+2. If metric != null:
+   → service = null
+
+3. If aggregation != null:
+   → service = null
+
+4. If service != null:
+   → metric = null
+   → aggregation = null
+
+5. If query classified as INVALID_QUERY:
+   → metric = null
+   → aggregation = null
+   → service = null
+
+DO NOT output invalid combinations
 
 --------------------------------------------------
 OUTPUT RULES:
