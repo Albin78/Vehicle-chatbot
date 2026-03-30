@@ -4,9 +4,8 @@ from app.schemas.request_schema import QueryRequest
 from app.agent.intent_extractor import extract_intent
 from app.agent.task_planner import create_plan
 from app.router.tool_router import route_tool
-from app.validators.result_validator import validate_result
+from app.validators.result_validator import validate_result, validate_intent, validate_action
 from app.agent.response_generator import generate_response
-from app.validators.intent_validation import validate_intent
 from app.validators.external_api_formatter import extract_imei_from_query
 from app.utils.logger import logger
 
@@ -24,12 +23,18 @@ def query_system(data: QueryRequest):
     intent = extract_intent(data.query)
 
     logger.info(f"Intent: {intent}")
+    logger.info(f"Intent action fetching: {intent.action}")
 
-    if not validate_intent(intent):
-        return {
-             "response": "I am a VMS chatbot, I am unable to answer the question."
-        }
+    intent_validation = validate_intent(intent)
+
+    if intent_validation["type"] == "error":
+        return intent_validation["message"]
     
+    action_validation = validate_action(intent)
+    
+    if action_validation["type"] == "error":
+        return action_validation["message"]
+
     imei = extract_imei_from_query(data.query)
 
     plan = create_plan(intent, imei)
@@ -38,9 +43,13 @@ def query_system(data: QueryRequest):
     
     logger.info(f"Final result before validation: {result}, type: {type(result)}")
     
-    validate_result(result)
+    validation = validate_result(result)
+    if validation["type"] == "error":
+        return validation["message"]
+    
+    validated_result = validation["data"]
 
-    response = generate_response(data.query, result, intent)
+    response = generate_response(data.query, validated_result, intent)
     
     logger.info(f"Response: {response}")
 

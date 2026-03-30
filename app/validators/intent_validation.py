@@ -8,7 +8,8 @@ def validate_intent(intent):
         intent.metric,
         intent.aggregation,
         intent.analysis,
-        intent.service
+        intent.service,
+        intent.action
     ]):
         return False
 

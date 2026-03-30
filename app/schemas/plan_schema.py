@@ -7,7 +7,7 @@ class ExecutionPlan(BaseModel):
 
     operation: str
 
-    metric: str | None
+    metric: str 
 
     imei: str | None
 

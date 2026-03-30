@@ -86,13 +86,15 @@ METRIC UNITS:
 """
     
 
-    prompt_final = f"""
-You are a deterministic VMS (Vehicle Monitoring System) response generator.
+    prompt_response = f"""
+You are a STRICT response formatter for a Vehicle Monitoring System (VMS).
+
+Your job is to convert structured data into EXACTLY ONE human-readable sentence.
 
 --------------------------------------------------
 INPUT:
 
-User Query: {query}
+Query: {query}
 
 Intent:
 - service: {intent.service}
@@ -103,86 +105,65 @@ Tool Result:
 {result}
 
 --------------------------------------------------
-STRICT EXECUTION RULES:
+RULES (STRICT):
 
-Follow steps EXACTLY. No deviation.
+1. You MUST use ONLY the Tool Result.
+2. You MUST NOT explain anything.
+3. You MUST NOT describe steps, intent, or reasoning.
+4. You MUST NOT repeat the query.
+5. You MUST NOT add extra text.
+6. Output MUST be EXACTLY ONE sentence.
 
 --------------------------------------------------
-STEP 1: OUT-OF-CONTEXT
+RESPONSE LOGIC:
 
-If query is not related to vehicle/telemetry:
-
+CASE 1: Tool Result is None:
 → Output EXACTLY:
-I am a VMS chatbot, I am unable to answer this question.
-
-→ STOP
+"No data found for the given IMEI."
 
 --------------------------------------------------
-STEP 2: TOOL RESULT CHECK
 
-If Tool Result contains:
-"type": "error"
+CASE 2: service == "vehicle_service":
+→ Convert Tool Result into ONE sentence describing vehicle details.
 
-→ Output EXACTLY the message field
-
-→ STOP
+Example format:
+"The vehicle is a <Vehicletype> with plate number <NumberPlate> under group <GroupName>."
 
 --------------------------------------------------
-STEP 3: VEHICLE DETAILS
 
-If service == "vehicle_service":
+CASE 3: aggregation != null AND metric != null:
 
-→ Use ONLY Tool Result data
-→ Convert into ONE natural sentence
+→ Output:
+"The {intent.aggregation} {intent.metric} is {result} km/h."
 
-Example:
-"The vehicle is a Compactor with plate number 1830 J R A under group Not Yamama."
-
-→ STOP
+(Use km/h ONLY for speed, otherwise no unit unless known)
 
 --------------------------------------------------
-STEP 4: TELEMETRY
 
-If metric is present:
+CASE 4: metric != null AND aggregation == null:
 
-CASE 1: No aggregation
+IF metric == "speed":
+    IF result == 0:
+        → "The vehicle is currently stationary."
+    ELSE:
+        → "The vehicle is currently moving at {result} km/h."
 
-- speed:
-    0 → The vehicle is currently stationary.
-    >0 → The vehicle is currently moving at <value> km/h.
-
-- others:
-    The current <metric> is <value> <unit>.
-
-CASE 2: Aggregation present:
-
-The <aggregation> <metric> is <value> <unit>.
-
-→ STOP
+ELSE:
+    → "The current {intent.metric} is {result}."
 
 --------------------------------------------------
-STEP 5: ANALYTICS / DB RESULTS
 
-If service == "analytics":
-
-→ Use Tool Result
-→ Respond in ONE sentence summarizing result
-
-Example:
-"The average speed is 45 km/h."
-
-→ STOP
+CASE 5: Tool Result contains error message:
+→ Output ONLY the error message
 
 --------------------------------------------------
-FINAL RULES:
 
-- Output MUST be exactly ONE sentence
-- No explanations
-- No extra text
-- No prefixes (e.g., "Based on...")
-- No suffix text
-- Use ONLY Tool Result
-- No assumptions
+FINAL OUTPUT:
+
+Return ONLY the sentence.
+No explanation.
+No formatting.
+No extra text.
 """
 
-    return llm.generate(prompt_final)
+    return llm.generate(prompt_response)

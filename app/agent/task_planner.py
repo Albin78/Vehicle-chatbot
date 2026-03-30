@@ -10,7 +10,7 @@ def create_plan(intent: QueryIntent, imei: Optional[str]) -> ExecutionPlan:
         return ExecutionPlan(
             tool="external_api",
             operation=intent.service,
-            metric=None,
+            metric="",
             imei=imei,
             time_range=None
         )
@@ -19,8 +19,8 @@ def create_plan(intent: QueryIntent, imei: Optional[str]) -> ExecutionPlan:
 
         return ExecutionPlan(
             tool="analytics",
-            operation=intent.analysis or intent.aggregation,
-            metric=intent.metric,
+            operation=intent.analysis or intent.aggregation or "",
+            metric=intent.metric or "",
             imei=imei,
             time_range=intent.time_range
         )
@@ -28,7 +28,7 @@ def create_plan(intent: QueryIntent, imei: Optional[str]) -> ExecutionPlan:
     return ExecutionPlan(
         tool="db",
         operation="fetch",
-        metric=intent.metric,
+        metric=intent.metric or "",
         imei=imei,
         time_range=intent.time_range
     )
