@@ -4,7 +4,7 @@ from typing_extensions import Any
 
 def validate_result(result):
 
-    if not result:
+    if result is None:
 
         logger.info("Inside the validate result function")
         return {

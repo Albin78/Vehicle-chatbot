@@ -105,14 +105,27 @@ Tool Result:
 {result}
 
 --------------------------------------------------
-RULES (STRICT):
+CRITICAL RULES (NON-NEGOTIABLE):
 
 1. You MUST use ONLY the Tool Result.
-2. You MUST NOT explain anything.
-3. You MUST NOT describe steps, intent, or reasoning.
-4. You MUST NOT repeat the query.
-5. You MUST NOT add extra text.
-6. Output MUST be EXACTLY ONE sentence.
+2. You MUST NOT infer or assume anything.
+3. You MUST NOT generate units unless explicitly defined below.
+4. You MUST NOT modify the value unless a rule explicitly allows it.
+5. Output MUST be EXACTLY ONE sentence.
+6. No explanations, no reasoning, no extra text.
+
+--------------------------------------------------
+UNIT RULES (STRICT MAPPING):
+
+Use ONLY the following unit mappings:
+
+- speed → km/h
+- batteryLevel → volts (V) AFTER conversion from millivolts:
+    value_in_volts = result / 1000 (round to 2 decimal places)
+
+
+If metric is not listed above:
+→ DO NOT add any unit.
 
 --------------------------------------------------
 RESPONSE LOGIC:
@@ -123,24 +136,35 @@ CASE 1: Tool Result is None:
 
 --------------------------------------------------
 
-CASE 2: service == "vehicle_service":
-→ Convert Tool Result into ONE sentence describing vehicle details.
+CASE 2: Tool Result contains error:
+→ Output ONLY the error message
 
-Example format:
+--------------------------------------------------
+
+CASE 3: service == "vehicle_service":
+
+→ Use ONLY Tool Result fields:
+Vehicletype, NumberPlate, GroupName
+
+→ Output:
 "The vehicle is a <Vehicletype> with plate number <NumberPlate> under group <GroupName>."
 
 --------------------------------------------------
 
-CASE 3: aggregation != null AND metric != null:
+CASE 4: aggregation != null AND metric != null:
 
-→ Output:
-"The {intent.aggregation} {intent.metric} is {result} km/h."
+IF metric == "speed":
+→ "The {intent.aggregation} speed is {result} km/h."
 
-(Use km/h ONLY for speed, otherwise no unit unless known)
+ELIF metric == "batteryLevel":
+→ "The {intent.aggregation} battery level is value V."
+
+ELSE:
+→ "The {intent.aggregation} {intent.metric} is {result}."
 
 --------------------------------------------------
 
-CASE 4: metric != null AND aggregation == null:
+CASE 5: metric != null AND aggregation == null:
 
 IF metric == "speed":
     IF result == 0:
@@ -153,16 +177,10 @@ ELSE:
 
 --------------------------------------------------
 
-CASE 5: Tool Result contains error message:
-→ Output ONLY the error message
-
---------------------------------------------------
-
 FINAL OUTPUT:
 
 Return ONLY the sentence.
 No explanation.
-No formatting.
 No extra text.
 """
 

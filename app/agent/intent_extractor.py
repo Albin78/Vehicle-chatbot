@@ -4,6 +4,7 @@ import re
 from app.db.mongoclient import get_collection
 from app.llm.ollama_client import OllamaClient
 from app.schemas.intent_schema import QueryIntent
+from app.tools.vehicle_cache import resolve_intent
 from app.utils.logger import logger
 
 llm = OllamaClient()
@@ -26,218 +27,250 @@ def get_db_fields():
     return fields
 
 
-def extract_intent(query: str) -> QueryIntent:
+
+
+def extract_intent(query: str) -> QueryIntent :  
 
     fields = get_db_fields()
 
-    prompt = f"""
-Extract telemetry query intent.
-
-Query: {query}
-
-Available telemetry metrics:
-{fields}
-
-Do NOT invent information that is not present in the query.
-
-Map synonyms to the correct aggregation:
-
-average, mean, avg → "average"  
-max, highest → "maximum"  
-min, lowest → "minimum"  
-
-Return ONLY valid JSON.
-
-{{
- "metric": "one of {fields} or null",
- "aggregation": "string | null",
- "analysis": "string | null",
- "time_range": "string | null",
- "service": "string | null"
-}}
-"""
-
     prompt_final = f"""
-You are a STRICT deterministic intent extraction system for a Vehicle Monitoring System (VMS).
+You are an intent extraction engine for a Vehicle Monitoring System (VMS).
 
-Your output MUST be a valid JSON object.
+Your job is to understand the user's query and extract structured intent.
 
---------------------------------------------------
+Return ONLY a valid JSON object.
+No explanation.
+No extra text.
+No markdown.
+
+----------------------------------------
 INPUT:
 Query: {query}
 
-Available Metrics (STRICT LIST):
+Available Metrics:
 {fields}
 
---------------------------------------------------
-CORE DEFINITIONS:
+----------------------------------------
 
-- IMEI → 15-digit identifier (NOT a metric)
-- Metric → telemetry field from provided list ONLY
-- Aggregation → operation on metric
-- Service → vehicle metadata request
-- Action → user operation
+TASK:
 
---------------------------------------------------
-FIELD EXTRACTION ORDER (STRICT):
+Extract the following fields based on the meaning of the query:
 
-1. ACTION
-2. IMEI
-3. AGGREGATION
-4. METRIC
-5. SERVICE
-6. TIME RANGE
-7. ANALYSIS
+- action: "fetch", "delete", or "update"
+- imei: a 15-digit identifier if present
+- metric: telemetry field explicitly mentioned in the query
+- aggregation: "average", "maximum", or "minimum" if clearly requested
+- time_range: "today", "yesterday", or "last_week" if mentioned
+- analysis: any analytical intent if clearly expressed
+- service: "vehicle_service" ONLY if the user is requesting vehicle details or metadata
 
---------------------------------------------------
-1. ACTION (STRICT – NO GUESSING)
+----------------------------------------
 
-Determine action ONLY using explicit keywords from the query.
+GUIDELINES:
 
-DELETE:
-- Trigger ONLY if query contains EXACT words:
-  "delete", "remove", "erase"
+1. Understand the intent of the query naturally.
+   - Do not rely on rigid keyword matching.
+   - Focus on what the user is trying to achieve.
 
-UPDATE:
-- Trigger ONLY if query contains EXACT words:
-  "update", "modify", "change"
+2. Extract ONLY what is clearly and explicitly present.
+   - Do not assume missing values.
+   - Do not infer beyond the query.
 
-FETCH:
-- Trigger if query contains:
-  "get", "fetch", "show", "retrieve", "what", "list"
+3. Metric extraction:
+   - Select a metric ONLY if it is explicitly mentioned in the query.
+   - The metric must match one of the available metrics.
+   - If no clear metric is mentioned → return null.
 
-  
-DEFAULT:
-- If NONE of the above keywords are present:
-  → action = "fetch"
+4. Aggregation:
+   - Extract only if the query clearly asks for min, max, or average.
 
+5. Service:
+   - Use "vehicle_service" only when the query is about vehicle details or metadata.
+   - Do NOT use service for telemetry queries (metrics like speed, battery, etc.)
 
-CRITICAL RULES:
-- DO NOT infer action
-- DO NOT assume intent
-- DO NOT use context outside the query
-- If "delete" keyword is NOT present → action MUST NOT be "delete"
-- If "update" keyword is NOT present → action MUST NOT be "update"
+6. IMEI:
+   - Extract only valid 15-digit numbers.
 
-If action != "fetch":
-→ metric = null
-→ aggregation = null
-→ service = null
+7. Domain awareness:
+   - If the query is unrelated to vehicles, IMEI, or telemetry:
+     → return all fields as null (except action = "fetch")
 
---------------------------------------------------
-2. IMEI
+----------------------------------------
 
-- Extract ONLY 15-digit number
-- If multiple → take FIRST
-- Else → null
---------------------------------------------------
-METRIC VALIDITY RULE (CRITICAL)
+IMPORTANT:
 
-If metric != null:
+- Prefer leaving fields as null rather than guessing.
+- Do not force values.
+- Do not try to satisfy all fields.
 
-→ IMEI MUST be present (15-digit number)
-
-If IMEI is null:
-→ metric MUST be set to null
-
-DO NOT allow metric extraction without IMEI
-
-
---------------------------------------------------
-
-3. AGGREGATION (HIGH PRIORITY)
-
-Mappings:
-
-- average, avg, mean → "average"
-- maximum, max, highest → "maximum"
-- minimum, min, lowest → "minimum"
-
-RULES:
-- If keyword exists → MUST extract
-- Case insensitive
-- Else → null
-
---------------------------------------------------
-4. METRIC
-
-- Must be EXACT match from:
-{fields}
-
-RULES:
-- Extract ONLY if explicitly mentioned
-- DO NOT infer
-- DO NOT guess
-- DO NOT map IMEI
-
-STRICT:
-- "imei" is NOT a metric
-- "device" only if explicitly present
-
---------------------------------------------------
-5. SERVICE (STRICT KEYWORD MATCH ONLY)
-
-SERVICE can ONLY be "vehicle_service" IF:
-
-ALL conditions are TRUE:
-
-1. action = "fetch"
-2. metric = null
-3. aggregation = null
-4. Query contains phrases (case insensitive):
-
-   - "vehicle details"
-   - "vehicle info"
-   - "vehicle information"
-   - "vehicle metadata"
-
---------------------------------------------------
-
-STRICT PROHIBITIONS:
-
-- DO NOT assign service if query contains only:
-  "vehicle", "car", "truck", or vehicle names (e.g., Land Cruiser)
-
-- DO NOT infer service from vehicle-related words
-
-- Partial matches are NOT allowed
-
---------------------------------------------------
-6. TIME RANGE
-
-- today, yesterday, last week
-Else → null
-
---------------------------------------------------
-7. ANALYSIS
-
-- Only if explicitly present
-Else → null
-
---------------------------------------------------
-FINAL VALIDATION (STRICT):
-
-- If aggregation != null → metric MUST NOT be null
-- If metric != null → service MUST be null
-- If service != null → metric = null AND aggregation = null
-- IMEI must NOT affect metric
-- NO guessing
-
---------------------------------------------------
-OUTPUT RULES:
-
-- ONLY JSON
-- NO explanation
-- NO extra text
-
---------------------------------------------------
+----------------------------------------
 
 OUTPUT FORMAT:
 
 {{
   "action": "fetch | delete | update",
+  "imei": "string | null",
+  "metric": "string | null",
+  "aggregation": "average | maximum | minimum | null",
+  "analysis": "string | null",
+  "time_range": "today | yesterday | last_week | null",
+  "service": "vehicle_service | null"
+}}
+"""
+
+    prompt = f"""
+
+You are a production-grade Intent Extraction Engine for a Vehicle Monitoring System (VMS).
+
+Your task is to extract structured intent from a user query.
+
+--------------------------------------------------
+CRITICAL OUTPUT RULES (NON-NEGOTIABLE)
+
+- Output MUST be VALID JSON
+- NO explanation
+- NO extra text
+- NO markdown
+- ALL null values MUST be actual null (NOT "null" string)
+
+--------------------------------------------------
+INPUT:
+Query: {query}
+
+Available Metrics:
+{fields}
+
+--------------------------------------------------
+STEP 0: DOMAIN GATE (HIGHEST PRIORITY)
+
+First determine if the query belongs to VMS domain.
+
+VMS DOMAIN includes:
+- Vehicle queries
+- IMEI-based queries
+- Telemetry (speed, battery, fuel, rpm, etc.)
+- Fleet / tracking / device data
+
+OUT-OF-DOMAIN includes:
+- Phones (iPhone, Samsung, etc.)
+- Shopping / price queries
+- News / weather / general knowledge
+
+IF query is OUT-OF-DOMAIN:
+RETURN IMMEDIATELY:
+
+{{
+  "action": "fetch",
+  "imei": null,
+  "metric": null,
+  "aggregation": null,
+  "analysis": null,
+  "time_range": null,
+  "service": null
+}}
+
+DO NOT PROCESS FURTHER.
+
+--------------------------------------------------
+STEP 1: ACTION
+
+Detect action:
+
+- delete/remove/erase → "delete"
+- update/modify/change → "update"
+- otherwise → "fetch"
+
+--------------------------------------------------
+STEP 2: IMEI
+
+- Extract ONLY 15-digit number
+- If multiple → take FIRST
+- Else → null
+
+--------------------------------------------------
+STEP 3: METRIC (HIGH PRIORITY SIGNAL)
+
+- Extract ONLY if explicitly present in:
+{fields}
+
+- If IMEI is null → metric MUST be null
+
+--------------------------------------------------
+STEP 4: AGGREGATION
+
+- avg/average/mean → "average"
+- max/highest → "maximum"
+- min/lowest → "minimum"
+
+Else → null
+
+--------------------------------------------------
+STEP 5: HARD DECISION GATE (MOST IMPORTANT)
+
+This step OVERRIDES everything below.
+
+IF metric != null:
+→ service MUST be null (NO EXCEPTION)
+
+IF aggregation != null:
+→ metric MUST NOT be null
+
+--------------------------------------------------
+STEP 6: SERVICE (ONLY IF SAFE)
+
+Assign service = "vehicle_service" ONLY IF:
+
+ALL conditions are TRUE:
+
+1. action == "fetch"
+2. metric == null
+3. aggregation == null
+4. Query is asking about vehicle metadata
+
+Examples:
+- "vehicle details for imei"
+- "show vehicle info"
+- "details of vehicle"
+
+Otherwise:
+→ service = null
+
+--------------------------------------------------
+STEP 7: TIME RANGE
+
+- today → "today"
+- yesterday → "yesterday"
+- last week → "last_week"
+
+Else → null
+
+--------------------------------------------------
+STEP 8: ANALYSIS
+
+- Only if explicitly present
+Else → null
+
+--------------------------------------------------
+FINAL VALIDATION (STRICT)
+
+- If action != "fetch":
+    metric = null
+    aggregation = null
+    service = null
+
+- If metric != null:
+    service = null   ← HARD OVERRIDE
+
+- If aggregation != null AND metric == null:
+    aggregation = null
+
+--------------------------------------------------
+FINAL OUTPUT FORMAT:
+
+{{
+  "action": "fetch | delete | update",
   "imei": "15-digit string | null",
-  "metric": "one of {fields} or null",
+  "metric": "value from list or null",
   "aggregation": "average | maximum | minimum | null",
   "analysis": "string | null",
   "time_range": "today | yesterday | last_week | null",
@@ -268,3 +301,6 @@ OUTPUT FORMAT:
     logger.info(f"JSON data: {data}")
 
     return QueryIntent(**data)
+    
+
+

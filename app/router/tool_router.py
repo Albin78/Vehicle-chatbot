@@ -1,6 +1,6 @@
 from app.tools.db_tool import fetch_telemetry
 from app.tools.analytics_tool import run_analytics
-from app.tools.external_api_tool import get_vehicle_details, get_vehicle_by_imei
+from app.tools.vehicle_cache import get_vehicle_from_cache
 from app.validators.external_api_formatter import data_formatter
 from app.utils.logger import logger
 from app.validators.result_validator import validate_api_response
@@ -19,8 +19,10 @@ def route_tool(plan):
         )
 
     if plan.tool == "external_api":
-        data = get_vehicle_details()
-        vehicle_detail = get_vehicle_by_imei(data, plan.imei)
+        
+        # data = get_vehicle_details()
+        # vehicle_detail = get_vehicle_by_imei(data, plan.imei)
+        vehicle_detail = get_vehicle_from_cache(plan.imei)
 
         validation = validate_api_response(vehicle_detail)
 
