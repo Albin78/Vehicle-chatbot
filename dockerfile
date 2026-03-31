@@ -1,22 +1,26 @@
-# Use official Python image
-FROM python:3.11-slim
+FROM python:3.10-slim-bookworm
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Set working directory
 WORKDIR /app
 
-# Install dependencies
+# No additional system packages are required
+# Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application files
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
 COPY . .
 
-# Expose FastAPI port
+# Create non-root user (security best practice)
+RUN useradd -m appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
 EXPOSE 8000
 
-# Run the FastAPI app using uvicorn
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

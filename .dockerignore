@@ -1,6 +1,56 @@
-.test/
+.git
+.gitignore
+.dockerignore
+Dockerfile
+README.md
+*.md
+*.env
+*.local
+*.log
+*.sqlite3
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+*.swp
+*.swo
+*.DS_Store
+.env*
+myenv/
+venv/
+node_modules/
+.idea/
+.vscode/
+*.egg-info/
+build/
+dist/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Ignore OS files
+Thumbs.db
+desktop.ini
+
+# Ignore Python virtual environments
+.venv/
+env/
+ENV/
+
+# Ignore bytecode and cache
+__pycache__/
+*.py[cod]
+
+# Ignore test output
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Ignore pipenv and poetry
+Pipfile.lock
+poetry.lock
+
+# Ignore Docker-compose override
+docker-compose.override.yml
 

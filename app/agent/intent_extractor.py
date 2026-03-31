@@ -36,7 +36,7 @@ def extract_intent(query: str) -> QueryIntent :
     prompt_final = f"""
 You are an intent extraction engine for a Vehicle Monitoring System (VMS).
 
-Your job is to understand the user's query and extract structured intent.
+Your task is to understand the user query and extract structured intent.
 
 Return ONLY a valid JSON object.
 No explanation.
@@ -47,61 +47,91 @@ No markdown.
 INPUT:
 Query: {query}
 
-Available Metrics:
+Available Metrics (REFERENCE ONLY):
 {fields}
 
 ----------------------------------------
 
 TASK:
 
-Extract the following fields based on the meaning of the query:
+Extract the following fields based ONLY on what is explicitly stated in the query:
 
 - action: "fetch", "delete", or "update"
 - imei: a 15-digit identifier if present
-- metric: telemetry field explicitly mentioned in the query
+- metric: telemetry field ONLY if explicitly mentioned in the query
 - aggregation: "average", "maximum", or "minimum" if clearly requested
 - time_range: "today", "yesterday", or "last_week" if mentioned
 - analysis: any analytical intent if clearly expressed
-- service: "vehicle_service" ONLY if the user is requesting vehicle details or metadata
+- service: "vehicle_service" ONLY if the query is about vehicle details or metadata
 
 ----------------------------------------
 
-GUIDELINES:
+CORE INSTRUCTION:
 
-1. Understand the intent of the query naturally.
-   - Do not rely on rigid keyword matching.
-   - Focus on what the user is trying to achieve.
+This is an EXTRACTION task, not a prediction task.
 
-2. Extract ONLY what is clearly and explicitly present.
-   - Do not assume missing values.
-   - Do not infer beyond the query.
+Only extract information that is directly present in the query text.
 
-3. Metric extraction:
-   - Select a metric ONLY if it is explicitly mentioned in the query.
-   - The metric must match one of the available metrics.
-   - If no clear metric is mentioned → return null.
+If something is not clearly present → return null.
 
-4. Aggregation:
-   - Extract only if the query clearly asks for min, max, or average.
-
-5. Service:
-   - Use "vehicle_service" only when the query is about vehicle details or metadata.
-   - Do NOT use service for telemetry queries (metrics like speed, battery, etc.)
-
-6. IMEI:
-   - Extract only valid 15-digit numbers.
-
-7. Domain awareness:
-   - If the query is unrelated to vehicles, IMEI, or telemetry:
-     → return all fields as null (except action = "fetch")
+It is VALID for all fields to be null.
 
 ----------------------------------------
 
-IMPORTANT:
+METRIC EXTRACTION (CRITICAL):
 
-- Prefer leaving fields as null rather than guessing.
-- Do not force values.
-- Do not try to satisfy all fields.
+- A metric must be extracted ONLY if the exact metric term appears in the query.
+- The term must match EXACTLY one of the available metrics.
+- Treat the metric list as a validation reference, NOT as options to choose from.
+
+DO NOT:
+- infer metrics
+- map similar meanings
+- substitute words
+- guess from context
+
+Examples:
+
+Query: "vehicle details for imei 123456789012345"
+→ metric = null
+
+Query: "what is speed for imei 123456789012345"
+→ metric = "speed"
+
+Query: "iphone price"
+→ metric = null
+
+----------------------------------------
+
+DOMAIN UNDERSTANDING:
+
+First determine if the query belongs to VMS domain.
+
+VMS includes:
+- vehicle-related queries
+- IMEI-based queries
+- telemetry data (speed, battery, rpm, etc.)
+
+If the query is NOT related to VMS:
+→ return all fields null (except action = "fetch")
+
+DO NOT attempt to map unrelated queries.
+
+----------------------------------------
+
+SERVICE EXTRACTION:
+
+- Use "vehicle_service" ONLY when the user is asking about vehicle details or metadata
+- Do NOT use service for telemetry queries
+
+----------------------------------------
+
+IMPORTANT BEHAVIOR:
+
+- Prefer null over incorrect extraction
+- Do not force mapping between query and schema
+- Do not try to fill all fields
+- Do not use the metric list unless the word appears in the query
 
 ----------------------------------------
 
