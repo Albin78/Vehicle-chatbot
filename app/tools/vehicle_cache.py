@@ -13,7 +13,7 @@ vehicle_cache = {
 
 CACHE_TTL = 300  # 5 minutes
 
-def load_vehicle_cache():
+def load_vehicle_cache(company_id):
     current_time = time.time()
 
     if (
@@ -22,7 +22,7 @@ def load_vehicle_cache():
     ):
         logger.info("[CACHE MISS] Reloading from API")
 
-        response = get_vehicle_details()
+        response = get_vehicle_details(company_id)
         vehicle_list = response.get("VehicleList", [])
 
         imei_map = {
@@ -43,24 +43,24 @@ def load_vehicle_cache():
     return vehicle_cache
 
 
-def get_vehicle_from_cache(imei):
-    cache = load_vehicle_cache()
+def get_vehicle_from_cache(imei, company_id):
+    cache = load_vehicle_cache(company_id)
     return cache["imei_map"].get(str(imei))
 
 
-def resolve_intent(intent):
-    # HARD GUARANTEES (production-safe)
+# def resolve_intent(intent):
+#     # HARD GUARANTEES (production-safe)
 
-    if intent.metric is not None:
-        intent.service = None
+#     if intent.metric is not None:
+#         intent.service = None
 
-    elif intent.aggregation is not None:
-        intent.service = None
+#     elif intent.aggregation is not None:
+#         intent.service = None
 
-    elif intent.imei is not None:
-        intent.service = "vehicle_service"
+#     elif intent.imei is not None:
+#         intent.service = "vehicle_service"
 
-    else:
-        intent.service = None
+#     else:
+#         intent.service = None
 
-    return intent
+#     return intent

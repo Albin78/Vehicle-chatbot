@@ -1,19 +1,28 @@
 import streamlit as st
 import requests
 
-API_URL = "http://localhost:8000/query"
+API_URL = "http://backend:8000/query"
 
 st.set_page_config(page_title="VMS Chatbot", layout="wide")
 
 st.title("VMS Chatbot")
 
+# -------------------------
 # Session history
+# -------------------------
 if "history" not in st.session_state:
     st.session_state.history = []
 
-# Inputs
-imei = st.text_input("Enter IMEI")
+# -------------------------
+# Sidebar (Better UX for system inputs)
+# -------------------------
+st.sidebar.header("Configuration")
 
+company_id = st.sidebar.text_input("Company ID")
+
+# -------------------------
+# Main Inputs
+# -------------------------
 query = st.text_input("Enter your query")
 
 col1, col2 = st.columns([1, 1])
@@ -22,35 +31,44 @@ with col1:
     submit = st.button("Run Query")
 
 with col2:
-    clear = st.button("Clear")
+    clear = st.button("Clear History")
 
+# -------------------------
+# Clear history
+# -------------------------
 if clear:
     st.session_state.history = []
 
+# -------------------------
+# Submit Logic
+# -------------------------
 if submit:
     if not query.strip():
         st.warning("Query cannot be empty")
-    elif not imei.strip():
-        st.warning("IMEI is required")
+
+    elif not company_id.strip():
+        st.warning("Company ID is required")
+
     else:
         try:
             with st.spinner("Processing..."):
+
                 response = requests.post(
                     API_URL,
                     json={
                         "query": query,
-                        "imei": imei
+                        "company_id": int(company_id)
                     },
                     headers={"Content-Type": "application/json"},
-                    timeout=10
+                    timeout=15
                 )
 
             if response.status_code != 200:
                 st.error(f"API Error: {response.status_code}")
                 st.text(response.text)
+
             else:
                 data = response.json()
-
                 answer = data.get("response", "No response available")
 
                 # Store history
@@ -59,9 +77,15 @@ if submit:
                     "answer": answer
                 })
 
-                # Display nicely
-                st.markdown("### Response")
-                st.success(answer)
-
         except Exception as e:
             st.error(f"Error: {str(e)}")
+
+# -------------------------
+# Display History
+# -------------------------
+if st.session_state.history:
+    st.markdown("### Chat History")
+
+    for item in reversed(st.session_state.history):
+        st.markdown(f"**You:** {item['query']}")
+        st.success(item["answer"])

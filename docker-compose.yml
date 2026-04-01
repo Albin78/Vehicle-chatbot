@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: dockerfile.backend
+    image: vmsbot-backend:latest
+    container_name: vmsbot-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.development
+    environment:
+      - MONGO_URI=mongodb://host.docker.internal:27017
+      - MONGO_DB=vms_battery_health
+      - MONGO_COLLECTION=raw_gps_jan
+      - OLLAMA_URL=http://host.docker.internal:11434/api/generate
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: dockerfile.frontend
+    image: vmsbot-frontend:latest
+    container_name: vmsbot-frontend
+    ports:
+      - "8501:8501"
+    environment:
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend

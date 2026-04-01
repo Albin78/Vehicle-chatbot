@@ -54,11 +54,11 @@ class QueryIntent(BaseModel):
         # -------------------------
         # RULE 5: IMEI validation
         # -------------------------
-        if self.imei is not None:
-            if not (self.imei.isdigit() and len(self.imei) == 15):
-                self.imei = None
-                self.metric = None
-                self.aggregation = None
-                self.service = None
+        # if self.imei is not None:
+        #     if not (self.imei.isdigit() and len(self.imei) == 15):
+        #         self.imei = None
+        #         self.metric = None
+        #         self.aggregation = None
+        #         self.service = None
 
         return self

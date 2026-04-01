@@ -6,7 +6,7 @@ from app.utils.logger import logger
 from app.validators.result_validator import validate_api_response
 
 
-def route_tool(plan):
+def route_tool(plan, company_id):
 
     if plan.tool == "db":
         return fetch_telemetry(plan.imei, plan.metric)
@@ -22,7 +22,7 @@ def route_tool(plan):
         
         # data = get_vehicle_details()
         # vehicle_detail = get_vehicle_by_imei(data, plan.imei)
-        vehicle_detail = get_vehicle_from_cache(plan.imei)
+        vehicle_detail = get_vehicle_from_cache(plan.imei, company_id)
 
         validation = validate_api_response(vehicle_detail)
 

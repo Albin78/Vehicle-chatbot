@@ -87,101 +87,72 @@ METRIC UNITS:
     
 
     prompt_response = f"""
-You are a STRICT response formatter for a Vehicle Monitoring System (VMS).
+You are a response formatter for a Vehicle Monitoring System.
 
-Your job is to convert structured data into EXACTLY ONE human-readable sentence.
+Return ONLY ONE sentence.
+Do NOT explain.
+Do NOT describe steps.
+Do NOT include reasoning.
+Do NOT add extra text.
 
---------------------------------------------------
+----------------------------------------
 INPUT:
 
 Query: {query}
 
 Intent:
-- service: {intent.service}
-- metric: {intent.metric}
-- aggregation: {intent.aggregation}
+service: {intent.service}
+metric: {intent.metric}
+aggregation: {intent.aggregation}
 
 Tool Result:
 {result}
 
---------------------------------------------------
-CRITICAL RULES (NON-NEGOTIABLE):
+----------------------------------------
 
-1. You MUST use ONLY the Tool Result.
-2. You MUST NOT infer or assume anything.
-3. You MUST NOT generate units unless explicitly defined below.
-4. You MUST NOT modify the value unless a rule explicitly allows it.
-5. Output MUST be EXACTLY ONE sentence.
-6. No explanations, no reasoning, no extra text.
+RULES:
 
---------------------------------------------------
-UNIT RULES (STRICT MAPPING):
+- Use ONLY the Tool Result.
+- Do NOT create or assume new values.
+- Do NOT compute new variables.
 
-Use ONLY the following unit mappings:
+----------------------------------------
 
-- speed → km/h
-- batteryLevel → volts (V) AFTER conversion from millivolts:
-    value_in_volts = result / 1000 (round to 2 decimal places)
+OUTPUT:
 
-
-If metric is not listed above:
-→ DO NOT add any unit.
-
---------------------------------------------------
-RESPONSE LOGIC:
-
-CASE 1: Tool Result is None:
-→ Output EXACTLY:
+1. If Tool Result is null:
 "No data found for the given IMEI."
 
---------------------------------------------------
+2. If Tool Result is an error string:
+Return it exactly.
 
-CASE 2: Tool Result contains error:
-→ Output ONLY the error message
-
---------------------------------------------------
-
-CASE 3: service == "vehicle_service":
-
-→ Use ONLY Tool Result fields:
-Vehicletype, NumberPlate, GroupName
-
-→ Output:
+3. If service is "vehicle_service":
 "The vehicle is a <Vehicletype> with plate number <NumberPlate> under group <GroupName>."
 
---------------------------------------------------
+4. If metric is "speed":
+    If aggregation exists:
+        "The {intent.aggregation} speed is {result} km/h."
+    Else:
+        If result == 0:
+            "The vehicle is stationary."
+        Else:
+            "The vehicle is moving at {result} km/h."
 
-CASE 4: aggregation != null AND metric != null:
+5. If metric is "batteryLevel":
+    If aggregation exists:
+        "The {intent.aggregation} battery level is {result} V."
+    Else:
+        "The current battery level is {result} V."
 
-IF metric == "speed":
-→ "The {intent.aggregation} speed is {result} km/h."
+6. If metric exists:
+    If aggregation exists:
+        "The {intent.aggregation} {intent.metric} is {result}."
+    Else:
+        "The current {intent.metric} is {result}."
 
-ELIF metric == "batteryLevel":
-→ "The {intent.aggregation} battery level is value V."
+----------------------------------------
 
-ELSE:
-→ "The {intent.aggregation} {intent.metric} is {result}."
-
---------------------------------------------------
-
-CASE 5: metric != null AND aggregation == null:
-
-IF metric == "speed":
-    IF result == 0:
-        → "The vehicle is currently stationary."
-    ELSE:
-        → "The vehicle is currently moving at {result} km/h."
-
-ELSE:
-    → "The current {intent.metric} is {result}."
-
---------------------------------------------------
-
-FINAL OUTPUT:
-
-Return ONLY the sentence.
-No explanation.
-No extra text.
+Return ONLY the final sentence.
 """
 
     return llm.generate(prompt_response)

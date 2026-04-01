@@ -2,7 +2,7 @@ from pymongo import MongoClient
 from app.config import settings
 
 client = MongoClient(settings.MONGO_URI)
-
+print(f"Mongo Client: {client}")
 db = client[settings.MONGO_DB]
 
 

@@ -4,7 +4,6 @@ import re
 from app.db.mongoclient import get_collection
 from app.llm.ollama_client import OllamaClient
 from app.schemas.intent_schema import QueryIntent
-from app.tools.vehicle_cache import resolve_intent
 from app.utils.logger import logger
 
 llm = OllamaClient()
@@ -13,6 +12,7 @@ llm = OllamaClient()
 def get_db_fields():
 
     collection = get_collection()
+    print(f"The mongo collection: {collection}")
 
     sample = collection.find_one()
 
@@ -149,45 +149,35 @@ OUTPUT FORMAT:
 """
 
     prompt = f"""
+You are an intent extraction engine for a Vehicle Monitoring System (VMS).
 
-You are a production-grade Intent Extraction Engine for a Vehicle Monitoring System (VMS).
+Return ONLY a valid JSON object.
+No explanation.
+No extra text.
 
-Your task is to extract structured intent from a user query.
-
---------------------------------------------------
-CRITICAL OUTPUT RULES (NON-NEGOTIABLE)
-
-- Output MUST be VALID JSON
-- NO explanation
-- NO extra text
-- NO markdown
-- ALL null values MUST be actual null (NOT "null" string)
-
---------------------------------------------------
+----------------------------------------
 INPUT:
 Query: {query}
 
-Available Metrics:
+VALID METRICS (REFERENCE ONLY):
 {fields}
 
---------------------------------------------------
-STEP 0: DOMAIN GATE (HIGHEST PRIORITY)
+----------------------------------------
 
-First determine if the query belongs to VMS domain.
+TASK:
 
-VMS DOMAIN includes:
-- Vehicle queries
-- IMEI-based queries
-- Telemetry (speed, battery, fuel, rpm, etc.)
-- Fleet / tracking / device data
+Understand the user query and extract structured intent.
 
-OUT-OF-DOMAIN includes:
-- Phones (iPhone, Samsung, etc.)
-- Shopping / price queries
-- News / weather / general knowledge
+----------------------------------------
 
-IF query is OUT-OF-DOMAIN:
-RETURN IMMEDIATELY:
+STEP 1 — DOMAIN CHECK:
+
+If the query is NOT related to:
+- vehicles
+- IMEI
+- telemetry
+
+Return EXACTLY:
 
 {{
   "action": "fetch",
@@ -199,108 +189,94 @@ RETURN IMMEDIATELY:
   "service": null
 }}
 
-DO NOT PROCESS FURTHER.
+----------------------------------------
 
---------------------------------------------------
-STEP 1: ACTION
+STEP 2 — INTENT TYPE CLASSIFICATION:
 
-Detect action:
+Classify the query into ONE type:
 
-- delete/remove/erase → "delete"
-- update/modify/change → "update"
-- otherwise → "fetch"
+TYPE A: TELEMETRY QUERY
+→ asking for measurable data (speed, battery, rpm, etc.)
 
---------------------------------------------------
-STEP 2: IMEI
+TYPE B: VEHICLE METADATA QUERY
+→ asking for vehicle details/info using IMEI
 
-- Extract ONLY 15-digit number
-- If multiple → take FIRST
-- Else → null
+IMPORTANT:
+- A query CANNOT be both types
+- Choose ONLY ONE
 
---------------------------------------------------
-STEP 3: METRIC (HIGH PRIORITY SIGNAL)
+----------------------------------------
 
-- Extract ONLY if explicitly present in:
-{fields}
+STEP 3 — EXTRACTION RULES:
 
-- If IMEI is null → metric MUST be null
+COMMON:
 
---------------------------------------------------
-STEP 4: AGGREGATION
+- action:
+  "delete" or "update" ONLY if explicitly present
+  else "fetch"
 
-- avg/average/mean → "average"
-- max/highest → "maximum"
-- min/lowest → "minimum"
+- imei:
+  extract ONLY if exactly 15 digits
+  else null
 
-Else → null
+----------------------------------------
 
---------------------------------------------------
-STEP 5: HARD DECISION GATE (MOST IMPORTANT)
+IF TYPE A (TELEMETRY):
 
-This step OVERRIDES everything below.
+- metric:
+  extract ONLY if exact word appears in query AND exists in VALID METRICS
+  else null
 
-IF metric != null:
-→ service MUST be null (NO EXCEPTION)
+- aggregation:
+  minimum / min → "minimum"
+  maximum / max → "maximum"
+  average / avg → "average"
+  else null
 
-IF aggregation != null:
-→ metric MUST NOT be null
+- service:
+  MUST be null
 
---------------------------------------------------
-STEP 6: SERVICE (ONLY IF SAFE)
+----------------------------------------
 
-Assign service = "vehicle_service" ONLY IF:
+IF TYPE B (VEHICLE METADATA):
 
-ALL conditions are TRUE:
+- service:
+  "vehicle_service"
 
-1. action == "fetch"
-2. metric == null
-3. aggregation == null
-4. Query is asking about vehicle metadata
+- metric:
+  MUST be null
 
-Examples:
-- "vehicle details for imei"
-- "show vehicle info"
-- "details of vehicle"
+- aggregation:
+  MUST be null
 
-Otherwise:
-→ service = null
+----------------------------------------
 
---------------------------------------------------
-STEP 7: TIME RANGE
+OTHER FIELDS:
 
-- today → "today"
-- yesterday → "yesterday"
-- last week → "last_week"
+- time_range:
+  today / yesterday / last week if explicitly present
 
-Else → null
+- analysis:
+  ONLY if explicitly stated
 
---------------------------------------------------
-STEP 8: ANALYSIS
+----------------------------------------
 
-- Only if explicitly present
-Else → null
+CRITICAL BEHAVIOR:
 
---------------------------------------------------
-FINAL VALIDATION (STRICT)
+- DO NOT guess
+- DO NOT infer
+- DO NOT map similar meanings
+- DO NOT pick values from list unless present in query
+- Prefer null over incorrect extraction
 
-- If action != "fetch":
-    metric = null
-    aggregation = null
-    service = null
+----------------------------------------
 
-- If metric != null:
-    service = null   ← HARD OVERRIDE
-
-- If aggregation != null AND metric == null:
-    aggregation = null
-
---------------------------------------------------
-FINAL OUTPUT FORMAT:
+OUTPUT FORMAT:
 
 {{
   "action": "fetch | delete | update",
-  "imei": "15-digit string | null",
-  "metric": "value from list or null",
+  "imei": "string | null",
+  "metric": "string | null",
   "aggregation": "average | maximum | minimum | null",
   "analysis": "string | null",
   "time_range": "today | yesterday | last_week | null",
@@ -309,7 +285,7 @@ FINAL OUTPUT FORMAT:
 """
 
 
-    response = llm.generate(prompt_final)
+    response = llm.generate(prompt)
 
     logger.info(f"Raw LLM Response: {response}")
 
