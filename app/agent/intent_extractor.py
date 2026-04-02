@@ -15,6 +15,7 @@ def get_db_fields():
     print(f"The mongo collection: {collection}")
 
     sample = collection.find_one()
+    print(f"Sample from mongo: {sample}")
 
     if sample is None:
         logger.warning("No documents found in collection")
