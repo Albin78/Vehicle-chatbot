@@ -87,13 +87,20 @@ METRIC UNITS:
     
 
     prompt_response = f"""
-You are a response formatter for a Vehicle Monitoring System.
+You are a strict response formatter for a Vehicle Monitoring System.
 
-Return ONLY ONE sentence.
-Do NOT explain.
-Do NOT describe steps.
-Do NOT include reasoning.
-Do NOT add extra text.
+Your job is to convert structured tool output into EXACTLY ONE clean sentence.
+
+----------------------------------------
+STRICT RULES:
+
+- Return ONLY ONE sentence.
+- Do NOT explain anything.
+- Do NOT add reasoning.
+- Do NOT infer or assume missing values.
+- Do NOT modify or compute new values.
+- Use ONLY the provided Tool Result.
+- Follow templates EXACTLY.
 
 ----------------------------------------
 INPUT:
@@ -109,46 +116,145 @@ Tool Result:
 {result}
 
 ----------------------------------------
+OUTPUT LOGIC:
 
-RULES:
+1. NULL HANDLING:
+- If Tool Result is null, empty, or missing:
+  "No data found for the given IMEI."
 
-- Use ONLY the Tool Result.
-- Do NOT create or assume new values.
-- Do NOT compute new variables.
+2. ERROR HANDLING:
+- If Tool Result is a string containing an error:
+  Return it EXACTLY as-is.
+
+3. VEHICLE SERVICE:
+- If service == "vehicle_service" AND Tool Result is a dictionary:
+  "The vehicle is a <Vehicletype> with plate number <NumberPlate> under group <GroupName>."
+
+You are a strict response formatter for a Vehicle Monitoring System.
+
+Return EXACTLY ONE sentence.
+
+----------------------------------------
+RULE PRIORITY (STRICT ORDER):
+
+1. Error handling
+2. Null handling
+3. Service formatting
+4. Metric formatting
+
+----------------------------------------
+CRITICAL RULES:
+
+- Use ONLY Tool Result
+- DO NOT infer or assume
+- DO NOT compute values
+- DO NOT override rules
+- ALWAYS follow priority
+
+----------------------------------------
+NULL HANDLING:
+
+If Tool Result is EXACTLY one of:
+null, None, "", "null", "None"
+
+Return:
+"No data found for the given IMEI."
+
+IMPORTANT:
+- 0 is VALID
+- 0 is NOT null
+- Numeric values are ALWAYS valid
+
+----------------------------------------
+ERROR HANDLING:
+
+If Tool Result is a string containing an error:
+Return it EXACTLY
+
+----------------------------------------
+NUMERIC RULE:
+
+If Tool Result is a number:
+- ALWAYS treat as valid
+- NEVER treat as missing
+
+----------------------------------------
+SPEED METRIC:
+
+If metric == "speed":
+
+IF aggregation exists:
+"The aggregation speed is {result} km/h."
+
+IMPORTANT:
+- EVEN IF result = 0 → use same format
+- DO NOT say stationary
+
+IF aggregation does NOT exist:
+- If result == 0:
+  "The vehicle is stationary."
+- Else:
+  "The vehicle is moving at {result} km/h."
+
+----------------------------------------
+BATTERY:
+
+If metric == "batteryLevel":
+
+IF aggregation exists:
+"The aggregation battery level is {result} V."
+
+ELSE:
+"The current battery level is {result} V."
+
+----------------------------------------
+GENERIC:
+
+If metric exists:
+
+IF aggregation exists:
+"The aggregation metric is {result}."
+
+ELSE:
+"The current metric is {result}."
+
+----------------------------------------
+EXAMPLES:
+
+Input:
+metric=speed, aggregation=minimum, result=0
+
+Output:
+"The minimum speed is 0 km/h."
 
 ----------------------------------------
 
-OUTPUT:
+Return ONLY ONE sentence.
 
-1. If Tool Result is null:
-"No data found for the given IMEI."
+5. BATTERY LEVEL:
 
-2. If Tool Result is an error string:
-Return it exactly.
+- If metric == "batteryLevel":
 
-3. If service is "vehicle_service":
-"The vehicle is a <Vehicletype> with plate number <NumberPlate> under group <GroupName>."
+  a) If aggregation exists:
+     "The {intent.aggregation} battery level is {result} V."
 
-4. If metric is "speed":
-    If aggregation exists:
-        "The {intent.aggregation} speed is {result} km/h."
-    Else:
-        If result == 0:
-            "The vehicle is stationary."
-        Else:
-            "The vehicle is moving at {result} km/h."
+  b) If aggregation does NOT exist:
+     "The current battery level is {result} V."
 
-5. If metric is "batteryLevel":
-    If aggregation exists:
-        "The {intent.aggregation} battery level is {result} V."
-    Else:
-        "The current battery level is {result} V."
+6. GENERIC METRIC:
 
-6. If metric exists:
-    If aggregation exists:
-        "The {intent.aggregation} {intent.metric} is {result}."
-    Else:
-        "The current {intent.metric} is {result}."
+- If metric exists:
+
+  a) If aggregation exists:
+     "The {intent.aggregation} {intent.metric} is {result}."
+
+  b) If aggregation does NOT exist:
+     "The current {intent.metric} is {result}."
+
+7. FALLBACK:
+
+- If none of the above conditions match:
+  "No valid data available."
 
 ----------------------------------------
 

@@ -18,47 +18,27 @@ class QueryIntent(BaseModel):
             return None
         return v
     
-
+    
     @model_validator(mode="after")
     def enforce_rules(self):
-        """
-        Final deterministic layer.
-        This OVERRIDES incorrect LLM output.
-        """
 
-        # -------------------------
-        # RULE 1: If metric exists → NO service
-        # -------------------------
+        # FORCE: if metric word exists in query → kill service
         if self.metric is not None:
             self.service = None
 
-        # -------------------------
-        # RULE 2: If aggregation exists → metric must exist
-        # -------------------------
-        if self.aggregation is not None and self.metric is None:
-            self.aggregation = None
-
-        # -------------------------
-        # RULE 3: If aggregation exists → NO service
-        # -------------------------
-        if self.aggregation is not None:
+        # CRITICAL FIX:
+        if self.metric is None and self.aggregation is not None:
+            # aggregation without metric → invalid → kill service
             self.service = None
 
-        # -------------------------
-        # RULE 4: Service allowed ONLY when safe
-        # -------------------------
-        if self.service is not None:
-            if self.metric is not None or self.aggregation is not None:
-                self.service = None  # force remove
+        # NEW RULE (IMPORTANT):
+        # If query contains metric keyword but model missed it
+        # → force remove service
+        # Only remove service if telemetry clearly exists
+        if self.metric is not None or self.aggregation is not None:
+            self.service = None
 
-        # -------------------------
-        # RULE 5: IMEI validation
-        # -------------------------
-        # if self.imei is not None:
-        #     if not (self.imei.isdigit() and len(self.imei) == 15):
-        #         self.imei = None
-        #         self.metric = None
-        #         self.aggregation = None
-        #         self.service = None
+        if self.aggregation is not None and self.metric is None:
+            self.aggregation = None
 
         return self

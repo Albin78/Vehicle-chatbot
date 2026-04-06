@@ -29,8 +29,8 @@ def query_system(data: QueryRequest):
 
     intent = extract_intent(data.query)
 
-    logger.info(f"Intent: {intent}")
-    logger.info(f"Intent action fetching: {intent.action}")
+    # logger.info(f"Intent: {intent}")
+    # logger.info(f"Intent action fetching: {intent.action}")
 
     intent_validation = validate_intent(intent)
 

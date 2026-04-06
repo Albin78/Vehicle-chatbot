@@ -43,16 +43,12 @@ def validate_action(intent) -> dict[str, Any]:
     }
     
 
-def validate_intent(intent) -> dict[str, Any]:
+def validate_intent(intent):
 
-    if not any([
-        intent.metric,
-        intent.aggregation,
-        intent.analysis,
-        intent.service,
-    ]) and intent.action == 'fetch':
-        
-        logger.info("Inside validate intent function")
+    is_telemetry = intent.metric is not None
+    is_vehicle = intent.service == "vehicle_service"
+
+    if intent.action == "fetch" and not (is_telemetry or is_vehicle):
         return {
             "type": "error",
             "message": "I am VMS Chatbot. I can't answer to these questions."
