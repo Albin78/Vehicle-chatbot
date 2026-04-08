@@ -9,7 +9,7 @@ AUTH_TOKEN = settings.BATTERY_API_TOKEN
 
 
 
-def get_vehicle_details(imei: Optional[str]=None, company_id: Optional[int]=16):
+def get_vehicle_details(company_id: Optional[int]=16):
 
     try:
         if not company_id:
@@ -83,13 +83,13 @@ def get_vehicle_details(imei: Optional[str]=None, company_id: Optional[int]=16):
 
 
 
-def get_vehicle_by_imei(api_response:dict[str, Any], imei: Optional[str]):
+def get_vehicle_by_vehicleid(api_response:dict[str, Any], vehicleid: Optional[str]):
     vehicle_list = api_response.get("VehicleList", [])
     logger.info(f"Vehicle list fetched: {vehicle_list}")
     
     # Build map (can cache this)
-    vehicle_map = {v["IMEI"]: v for v in vehicle_list}
+    vehicleid_map = {v["NumberPlate"]: v for v in vehicle_list}
 
-    logger.info(f"Vehicle Map: {vehicle_map}")
+    logger.info(f"Vehicle Map: {vehicleid_map}")
     
-    return vehicle_map.get(imei)
+    return vehicleid_map.get(vehicleid)

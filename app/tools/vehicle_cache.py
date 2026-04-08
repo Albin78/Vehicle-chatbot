@@ -6,7 +6,7 @@ import time
 
 vehicle_cache = {
     "data": None,
-    "imei_map": {},
+    "vehicle_map": {},
     "last_updated": None
 }
 
@@ -25,17 +25,17 @@ def load_vehicle_cache(company_id):
         response = get_vehicle_details(company_id)
         vehicle_list = response.get("VehicleList", [])
 
-        imei_map = {
-            str(v.get("IMEI")).strip(): v
+        vehicle_map = {
+            str(v.get("NumberPlate")).strip(): v
             for v in vehicle_list
-            if isinstance(v, dict) and v.get("IMEI")
+            if isinstance(v, dict) and v.get("NumberPlate")
         }
 
         vehicle_cache["data"] = vehicle_list
-        vehicle_cache["imei_map"] = imei_map
+        vehicle_cache["vehicle_map"] = vehicle_map
         vehicle_cache["last_updated"] = current_time
 
-        logger.info(f"[CACHE BUILT] {len(imei_map)} vehicles loaded")
+        logger.info(f"[CACHE BUILT] {len(vehicle_map)} vehicles loaded")
 
     else:
         logger.info("[CACHE HIT] Using existing cache")
@@ -43,24 +43,6 @@ def load_vehicle_cache(company_id):
     return vehicle_cache
 
 
-def get_vehicle_from_cache(imei, company_id):
+def get_vehicle_from_cache(vehicle_id, company_id):
     cache = load_vehicle_cache(company_id)
-    return cache["imei_map"].get(str(imei))
-
-
-# def resolve_intent(intent):
-#     # HARD GUARANTEES (production-safe)
-
-#     if intent.metric is not None:
-#         intent.service = None
-
-#     elif intent.aggregation is not None:
-#         intent.service = None
-
-#     elif intent.imei is not None:
-#         intent.service = "vehicle_service"
-
-#     else:
-#         intent.service = None
-
-#     return intent
+    return cache["vehicle_map"].get(str(vehicle_id))

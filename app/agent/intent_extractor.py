@@ -28,161 +28,21 @@ def get_db_fields():
     return fields
 
 
-
-
 def extract_intent(query: str) -> QueryIntent :  
 
     fields = get_db_fields()
 
-    prompt_final = f"""
-You are an intent extraction engine for a Vehicle Monitoring System (VMS).
-
-Your task is to understand the user query and extract structured intent.
-
-Return ONLY a valid JSON object.
-No explanation.
-No extra text.
-No markdown.
-
-----------------------------------------
-INPUT:
-Query: {query}
-
-Available Metrics (REFERENCE ONLY):
-{fields}
-
-----------------------------------------
-
-TASK:
-
-Extract the following fields based ONLY on what is explicitly stated in the query:
-
-- action: "fetch", "delete", or "update"
-- imei: a 15-digit identifier if present
-- metric: telemetry field ONLY if explicitly mentioned in the query
-- aggregation: "average", "maximum", or "minimum" if clearly requested
-- time_range: "today", "yesterday", or "last_week" if mentioned
-- analysis: any analytical intent if clearly expressed
-- service: "vehicle_service" ONLY if the query is about vehicle details or metadata
-
-----------------------------------------
-
-CORE INSTRUCTION:
-
-This is an EXTRACTION task, not a prediction task.
-
-Only extract information that is directly present in the query text.
-
-If something is not clearly present → return null.
-
-It is VALID for all fields to be null.
-
-----------------------------------------
-
-METRIC EXTRACTION (CRITICAL):
-
-- A metric must be extracted ONLY if the exact metric term appears in the query.
-- The term must match EXACTLY one of the available metrics.
-- Treat the metric list as a validation reference, NOT as options to choose from.
-
-DO NOT:
-- infer metrics
-- map similar meanings
-- substitute words
-- guess from context
-
-Examples:
-
-Query: "vehicle details for imei 123456789012345"
-→ metric = null
-
-Query: "what is speed for imei 123456789012345"
-→ metric = "speed"
-
-Query: "iphone price"
-→ metric = null
-
-----------------------------------------
-
-DOMAIN UNDERSTANDING:
-
-First determine if the query belongs to VMS domain.
-
-VMS includes:
-- vehicle-related queries
-- IMEI-based queries
-- telemetry data (speed, battery, rpm, etc.)
-
-If the query is NOT related to VMS:
-→ return all fields null (except action = "fetch")
-
-DO NOT attempt to map unrelated queries.
-
-----------------------------------------
-
-SERVICE EXTRACTION:
-
-- Use "vehicle_service" ONLY when the user is asking about vehicle details or metadata
-- Do NOT use service for telemetry queries
-
-----------------------------------------
-
-IMPORTANT BEHAVIOR:
-
-- Prefer null over incorrect extraction
-- Do not force mapping between query and schema
-- Do not try to fill all fields
-- Do not use the metric list unless the word appears in the query
-
-----------------------------------------
-
-OUTPUT FORMAT:
-
-{{
-  "action": "fetch | delete | update",
-  "imei": "string | null",
-  "metric": "string | null",
-  "aggregation": "average | maximum | minimum | null",
-  "analysis": "string | null",
-  "time_range": "today | yesterday | last_week | null",
-  "service": "vehicle_service | null"
-}}
-"""
-
     prompt = f"""
-You are an intent extraction engine for a Vehicle Monitoring System (VMS).
+You are a JSON extractor.
 
-Return ONLY a valid JSON object.
-No explanation.
-No extra text.
+Your job is to FILL values into a FIXED JSON structure.
 
 ----------------------------------------
-INPUT:
-Query: {query}
-
-VALID METRICS (REFERENCE ONLY):
-{fields}
-
-----------------------------------------
-
-TASK:
-
-Understand the user query and extract structured intent.
-
-----------------------------------------
-
-STEP 1 — DOMAIN CHECK:
-
-If the query is NOT related to:
-- vehicles
-- IMEI
-- telemetry
-
-Return EXACTLY:
+OUTPUT (COPY EXACTLY):
 
 {{
-  "action": "fetch",
-  "imei": null,
+  "action": "",
+  "vehicle_id": null,
   "metric": null,
   "aggregation": null,
   "analysis": null,
@@ -191,98 +51,104 @@ Return EXACTLY:
 }}
 
 ----------------------------------------
+RULES (STRICT):
 
-STEP 2 — INTENT TYPE CLASSIFICATION:
-
-Classify the query into ONE type:
-
-TYPE A: TELEMETRY QUERY
-→ asking for measurable data (speed, battery, rpm, etc.)
-
-TYPE B: VEHICLE METADATA QUERY
-→ asking for vehicle details/info using IMEI
-
-IMPORTANT:
-- A query CANNOT be both types
-- Choose ONLY ONE
+- ONLY fill values
+- DO NOT add new keys
+- DO NOT output "imei"
+- DO NOT output anything outside JSON
+- Use null (not "null")
 
 ----------------------------------------
+INPUT:
 
-STEP 3 — EXTRACTION RULES:
+Query: {query}
 
-COMMON:
-
-- action:
-  "delete" or "update" ONLY if explicitly present
-  else "fetch"
-
-- imei:
-  extract ONLY if exactly 15 digits
-  else null
+VALID METRICS:
+{fields}
 
 ----------------------------------------
+FILLING RULES:
 
-IF TYPE A (TELEMETRY):
-
-- metric:
-  extract ONLY if exact word appears in query AND exists in VALID METRICS
-  else null
-
-- aggregation:
-  minimum / min → "minimum"
-  maximum / max → "maximum"
-  average / avg → "average"
-  else null
-
-- service:
-  MUST be null
+1. ACTION:
+- if "delete" → "delete"
+- if "update" → "update"
+- else → "fetch"
 
 ----------------------------------------
+2. VEHICLE ID (MANDATORY - TOP PRIORITY)
 
-IF TYPE B (VEHICLE METADATA):
+Search for EXACT text:
 
-- service:
-  "vehicle_service"
+"vehicle id"
+"vehicle number"
+"vehicle_id"
 
-- metric:
-  MUST be null
+IF FOUND:
+- Take EVERYTHING after it
+- Keep exact text (case + spaces)
 
-- aggregation:
-  MUST be null
+Example:
+"vehicle id 33 AZS" → "33 AZS"
 
-----------------------------------------
-
-OTHER FIELDS:
-
-- time_range:
-  today / yesterday / last week if explicitly present
-
-- analysis:
-  ONLY if explicitly stated
+CRITICAL:
+- If phrase exists → vehicle_id MUST NOT be null
+- Returning null is WRONG
 
 ----------------------------------------
+3. METRIC:
 
-CRITICAL BEHAVIOR:
-
-- DO NOT guess
-- DO NOT infer
-- DO NOT map similar meanings
-- DO NOT pick values from list unless present in query
-- Prefer null over incorrect extraction
+- Match ONLY exact words from VALID METRICS
+- DO NOT use:
+  vehicle, vehicle id, vehicle number
 
 ----------------------------------------
+4. AGGREGATION:
 
-OUTPUT FORMAT:
+- min/minimum → "minimum"
+- max/maximum → "maximum"
+- avg/average → "average"
 
+----------------------------------------
+5. SERVICE:
+
+IF vehicle_id != null AND metric == null:
+→ "vehicle_service"
+
+ELSE:
+→ null
+
+----------------------------------------
+6. TIME RANGE:
+
+- today → "today"
+- yesterday → "yesterday"
+- last week → "last_week"
+
+----------------------------------------
+7. ANALYSIS:
+
+Always null unless clearly present
+
+----------------------------------------
+VALID EXAMPLE:
+
+Query: Fetch details of vehicle with vehicle id 33 AZS
+
+Output:
 {{
-  "action": "fetch | delete | update",
-  "imei": "string | null",
-  "metric": "string | null",
-  "aggregation": "average | maximum | minimum | null",
-  "analysis": "string | null",
-  "time_range": "today | yesterday | last_week | null",
-  "service": "vehicle_service | null"
+  "action": "fetch",
+  "vehicle_id": "33 AZS",
+  "metric": null,
+  "aggregation": null,
+  "analysis": null,
+  "time_range": null,
+  "service": "vehicle_service"
 }}
+
+----------------------------------------
+
+RETURN ONLY JSON
 """
 
 
