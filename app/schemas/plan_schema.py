@@ -11,4 +11,6 @@ class ExecutionPlan(BaseModel):
 
     imei: str | None
 
+    vehicle_id: str | None
+
     time_range: str | None

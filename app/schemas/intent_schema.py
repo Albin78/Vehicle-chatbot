@@ -32,28 +32,30 @@ class QueryIntent(BaseModel):
     # -----------------------------
     @model_validator(mode="after")
     def enforce_rules(self):
-        """
-        Enforce strict business logic after extraction.
-        """
 
-        # ----------------------------------
+        # -----------------------------
+        # Normalize fields first
+        # -----------------------------
+        metric_exists = self.metric is not None
+        vehicle_exists = self.vehicle_id is not None
+
+        # -----------------------------
         # RULE 1: Aggregation requires metric
-        # ----------------------------------
-        if self.aggregation and not self.metric:
+        # -----------------------------
+        if self.aggregation and not metric_exists:
             self.aggregation = None
 
-        # ----------------------------------
-        # RULE 2: Service assignment
-        # ----------------------------------
-        # Service should ONLY exist for pure vehicle queries
-        if self.vehicle_id and not self.metric:
+        # -----------------------------
+        # RULE 2: Service (STRICT)
+        # -----------------------------
+        if vehicle_exists and not metric_exists:
             self.service = "vehicle_service"
         else:
             self.service = None
 
-        # ----------------------------------
-        # RULE 3: Action default safety
-        # ----------------------------------
+        # -----------------------------
+        # RULE 3: Action default
+        # -----------------------------
         if self.action not in {"fetch", "update", "delete"}:
             self.action = "fetch"
 

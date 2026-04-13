@@ -11,7 +11,14 @@ vehicle_cache = {
 }
 
 
-CACHE_TTL = 300  # 5 minutes
+CACHE_TTL = 600  # 5 minutes
+
+def normalize_vehicle_id(v_id: str) -> str:
+    if not v_id:
+        return ""
+    return "".join(v_id.split()).upper()
+
+
 
 def load_vehicle_cache(company_id):
     current_time = time.time()
@@ -25,24 +32,34 @@ def load_vehicle_cache(company_id):
         response = get_vehicle_details(company_id)
         vehicle_list = response.get("VehicleList", [])
 
-        vehicle_map = {
-            str(v.get("NumberPlate")).strip(): v
-            for v in vehicle_list
-            if isinstance(v, dict) and v.get("NumberPlate")
-        }
+        vehicle_map = {}
+
+        for v in vehicle_list:
+            if not isinstance(v, dict):
+                continue
+
+            number_plate = v.get("NumberPlate")
+            
+            # Normalize keys
+            if number_plate:
+                norm_plate = normalize_vehicle_id(number_plate)
+                vehicle_map[norm_plate] = v
 
         vehicle_cache["data"] = vehicle_list
         vehicle_cache["vehicle_map"] = vehicle_map
         vehicle_cache["last_updated"] = current_time
 
-        logger.info(f"[CACHE BUILT] {len(vehicle_map)} vehicles loaded")
+        logger.info(f"[CACHE BUILT] {len(vehicle_map)} indexed keys")
 
     else:
         logger.info("[CACHE HIT] Using existing cache")
+    
+    logger.info(f"Vehicle map Cache: {vehicle_cache['vehicle_map']}")
 
     return vehicle_cache
 
 
 def get_vehicle_from_cache(vehicle_id, company_id):
     cache = load_vehicle_cache(company_id)
-    return cache["vehicle_map"].get(str(vehicle_id))
+    key = normalize_vehicle_id(vehicle_id)
+    return cache["vehicle_map"].get(key)

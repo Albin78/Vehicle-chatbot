@@ -19,17 +19,16 @@ def route_tool(plan, company_id):
         )
 
     if plan.tool == "external_api":
-        
-        # data = get_vehicle_details()
-        # vehicle_detail = get_vehicle_by_imei(data, plan.imei)
-        vehicle_detail = get_vehicle_from_cache(plan.imei, company_id)
+
+        vehicle_detail = get_vehicle_from_cache(plan.vehicle_id, company_id)
 
         validation = validate_api_response(vehicle_detail)
 
         if validation["type"] == "error":
-            return validation["message"]  
-        
+            return validation["message"]
+
         validated_result = validation["data"]
 
-        logger.info(f"Vehicle detail using imei {plan.imei}:{validated_result}")
+        logger.info(f"Vehicle detail using vehicle_id {plan.vehicle_id}: {validated_result}")
+
         return data_formatter(validated_result)

@@ -6,8 +6,8 @@ from app.agent.task_planner import create_plan
 from app.router.tool_router import route_tool
 from app.validators.result_validator import validate_result, validate_intent, validate_action
 from app.agent.response_generator import generate_response
-from app.validators.external_api_formatter import extract_imei_from_query
 from app.utils.logger import logger
+from app.tools.vehicle_resolver import resolve_vehicle
 
 router = APIRouter()
 
@@ -16,48 +16,60 @@ router = APIRouter()
 def query_system(data: QueryRequest):
 
     if not data.query:
-        return {
-            "response": "Please provide query."
-        }
-    
+        return {"response": "Please provide query."}
+
     company_id = data.company_id
 
     if not company_id:
-         return {
-            "response": "Please provide query."
-        }        
+        return {"response": "Please provide company id."}
 
     intent = extract_intent(data.query)
 
-    # logger.info(f"Intent: {intent}")
-    # logger.info(f"Intent action fetching: {intent.action}")
+    logger.info(f"Intent: {intent}")
+    logger.info(f"Intent vehicle id: {intent.vehicle_id}")
 
     intent_validation = validate_intent(intent)
-
     if intent_validation["type"] == "error":
         return {"response": intent_validation["message"]}
-    
+
     action_validation = validate_action(intent)
-    
     if action_validation["type"] == "error":
         return {"response": action_validation["message"]}
 
-    imei = extract_imei_from_query(data.query)
+    # -----------------------------
+    # NEW: RESOLVE VEHICLE
+    # -----------------------------
+    vehicle_context = None
 
-    plan = create_plan(intent, imei)
+    if intent.vehicle_id:
+        vehicle_context = resolve_vehicle(intent.vehicle_id, company_id)
 
+        if not vehicle_context:
+            return {"response": "Vehicle not found."}
+
+    imei = vehicle_context["imei"] if vehicle_context else None
+    vehicle_id = vehicle_context["vehicle_id"] if vehicle_context else None
+
+    # -----------------------------
+    # PLAN
+    # -----------------------------
+    plan = create_plan(intent, imei=imei, vehicle_id=vehicle_id)
+
+    # -----------------------------
+    # EXECUTION
+    # -----------------------------
     result = route_tool(plan, company_id)
-    
+
     logger.info(f"Final result before validation: {result}, type: {type(result)}")
-    
+
     validation = validate_result(result)
     if validation["type"] == "error":
         return {"response": validation["message"]}
-    
+
     validated_result = validation["data"]
 
     response = generate_response(data.query, validated_result, intent)
-    
+
     logger.info(f"Response: {response}")
 
     return {"response": response}

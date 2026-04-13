@@ -83,13 +83,67 @@ def get_vehicle_details(company_id: Optional[int]=16):
 
 
 
-def get_vehicle_by_vehicleid(api_response:dict[str, Any], vehicleid: Optional[str]):
-    vehicle_list = api_response.get("VehicleList", [])
-    logger.info(f"Vehicle list fetched: {vehicle_list}")
-    
-    # Build map (can cache this)
-    vehicleid_map = {v["NumberPlate"]: v for v in vehicle_list}
+def get_operation_summary(
+    id: int,
+    company_id: int,
+    from_date: str,
+    to_date: str
+):
+    try:
+        if not id:
+            return {"response": "ID is required"}
 
-    logger.info(f"Vehicle Map: {vehicleid_map}")
-    
-    return vehicleid_map.get(vehicleid)
+        headers = {
+            "Authorization": f"Bearer {AUTH_TOKEN}",
+            "Accept": "*/*",
+            "User-Agent": "MyUserAgent"
+        }
+
+        url = "https://api.girfalco.sa/v2/report/operationSummary"
+
+        params = {
+            "vehicleID": id,
+            "fromDate": from_date,
+            "toDate": to_date,
+            "vehicleType": "All",
+            "vehicleGroup": "All",
+            "cid": company_id,
+            "vgid": "",
+            "type": "daily",
+            "page": 1,
+            "row": 10
+        }
+
+        logger.info(f"Calling Operation Summary API for vehicleID: {id}")
+
+        response = requests.get(
+            url,
+            headers=headers,
+            params=params,
+            timeout=10
+        )
+
+        logger.info(f"Status Code: {response.status_code}")
+
+        if response.status_code != 200:
+            logger.error(f"HTTP Error: {response.status_code}")
+            return {"response": "Unable to fetch operation summary"}
+
+        data = response.json()
+
+        if not data.get("dataRows"):
+            return {"response": "No data available for this vehicle"}
+
+        return data
+
+    except requests.exceptions.Timeout:
+        logger.exception("Timeout Error")
+        return {"response": "Request timed out"}
+
+    except requests.exceptions.ConnectionError:
+        logger.exception("Connection Error")
+        return {"response": "Unable to connect to report service"}
+
+    except Exception:
+        logger.exception("Unexpected Error")
+        return {"response": "Some internal error happened"}
