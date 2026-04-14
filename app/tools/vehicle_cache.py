@@ -62,4 +62,5 @@ def load_vehicle_cache(company_id):
 def get_vehicle_from_cache(vehicle_id, company_id):
     cache = load_vehicle_cache(company_id)
     key = normalize_vehicle_id(vehicle_id)
+    logger.info(f"Normalized vehicle ids: {key}")
     return cache["vehicle_map"].get(key)

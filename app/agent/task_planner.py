@@ -3,7 +3,8 @@ from app.schemas.plan_schema import ExecutionPlan
 from typing import Optional
 
 
-def create_plan(intent: QueryIntent, imei: Optional[str], vehicle_id: Optional[str]) -> ExecutionPlan:
+def create_plan(intent: QueryIntent, imei: Optional[str], 
+                vehicle_id: Optional[str]) -> ExecutionPlan:
 
     if intent.service:
         return ExecutionPlan(
@@ -12,7 +13,7 @@ def create_plan(intent: QueryIntent, imei: Optional[str], vehicle_id: Optional[s
             metric="",
             imei=imei,              # keep imei available
             vehicle_id=vehicle_id,
-            time_range=None
+            time_range=intent.time_range
         )
 
     if intent.analysis or intent.aggregation:

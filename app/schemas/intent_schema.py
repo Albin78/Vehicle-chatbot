@@ -1,3 +1,4 @@
+import re
 from typing import Optional
 from pydantic import BaseModel, field_validator, model_validator
 
@@ -13,50 +14,59 @@ class QueryIntent(BaseModel):
 
 
     # -----------------------------
-    # FIELD CLEANING
+    # CLEAN NULL STRINGS
     # -----------------------------
     @field_validator("*", mode="before")
     @classmethod
     def clean_null_strings(cls, v):
-        """
-        Normalize string nulls coming from LLM:
-        "null", "None", "" → None
-        """
         if isinstance(v, str) and v.strip().lower() in {"null", "none", ""}:
             return None
         return v
 
 
     # -----------------------------
-    # BUSINESS RULE VALIDATION
+    # NORMALIZATION
+    # -----------------------------
+    @field_validator("vehicle_id", mode="before")
+    @classmethod
+    def normalize_vehicle_id(cls, v):
+        if isinstance(v, str):
+            return re.sub(r"\s+", "", v).upper()
+        return v
+
+
+    @field_validator("time_range", mode="before")
+    @classmethod
+    def normalize_time_range(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
+
+    # -----------------------------
+    # BUSINESS RULES (UPDATED)
     # -----------------------------
     @model_validator(mode="after")
     def enforce_rules(self):
 
-        # -----------------------------
-        # Normalize fields first
-        # -----------------------------
         metric_exists = self.metric is not None
         vehicle_exists = self.vehicle_id is not None
 
-        # -----------------------------
-        # RULE 1: Aggregation requires metric
-        # -----------------------------
+        # Aggregation requires metric
         if self.aggregation and not metric_exists:
             self.aggregation = None
 
+        # Action default
+        if self.action not in {"fetch", "update", "delete"}:
+            self.action = "fetch"
+
         # -----------------------------
-        # RULE 2: Service (STRICT)
+        # SERVICE (UPDATED LOGIC)
         # -----------------------------
-        if vehicle_exists and not metric_exists:
+        if vehicle_exists:
+            # ALWAYS go through vehicle_service first
             self.service = "vehicle_service"
         else:
             self.service = None
-
-        # -----------------------------
-        # RULE 3: Action default
-        # -----------------------------
-        if self.action not in {"fetch", "update", "delete"}:
-            self.action = "fetch"
 
         return self

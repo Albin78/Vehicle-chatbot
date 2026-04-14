@@ -2,6 +2,7 @@ import requests
 from typing_extensions import Optional, Any
 from app.utils.logger import logger
 from app.config import settings
+from datetime import datetime
 
 
 BASE_URL = settings.VEHICLE_API_URL
@@ -45,7 +46,7 @@ def get_vehicle_details(company_id: Optional[int]=16):
         data = response.json()
         vehicle_count = data.get("VehicleCount", [])
 
-        logger.info(f"API Response: {data}")
+        # logger.info(f"API Response: {data}")
         logger.info(f"Total Vehicle Count: {vehicle_count[0].get('TotalCount', 0)}")
 
         # HANDLE API-LEVEL FAILURE
@@ -84,10 +85,10 @@ def get_vehicle_details(company_id: Optional[int]=16):
 
 
 def get_operation_summary(
-    id: int,
-    company_id: int,
-    from_date: str,
-    to_date: str
+    id: int | None,
+    company_id: int | None,
+    from_date: datetime | None,
+    to_date: datetime | None
 ):
     try:
         if not id:

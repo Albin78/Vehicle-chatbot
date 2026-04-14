@@ -1,7 +1,9 @@
 from app.tools.db_tool import fetch_telemetry
 from app.tools.analytics_tool import run_analytics
-from app.tools.vehicle_cache import get_vehicle_from_cache
-from app.validators.external_api_formatter import data_formatter
+from app.tools.vehicle_resolver import resolve_vehicle
+from app.tools.external_api_tool import get_operation_summary
+from app.utils.dateparser import parse_time_range
+from app.validators.external_api_formatter import format_operation_summary
 from app.utils.logger import logger
 from app.validators.result_validator import validate_api_response
 
@@ -20,9 +22,28 @@ def route_tool(plan, company_id):
 
     if plan.tool == "external_api":
 
-        vehicle_detail = get_vehicle_from_cache(plan.vehicle_id, company_id)
+        vehicle_detail = resolve_vehicle(plan.vehicle_id, company_id)
+        logger.info(f"Vehicle details fetched: {vehicle_detail}")
+        logger.info(f"Date from intent: {plan.time_range}")
 
-        validation = validate_api_response(vehicle_detail)
+        from_date, to_date = parse_time_range(plan.time_range)
+
+        if not vehicle_detail:
+            return {"response": "Vehicle not found"}
+
+        # Safe after this point
+        id = vehicle_detail["ID"]
+        logger.info(f"ID retrieved: {id}")
+        logger.info(f"Date retrived and formatted as (start, end): {from_date, to_date}")
+        
+        result = get_operation_summary(
+            id=id, 
+            company_id=company_id,
+            from_date=from_date,
+            to_date=to_date
+        )
+
+        validation = validate_api_response(result)
 
         if validation["type"] == "error":
             return validation["message"]
@@ -31,4 +52,4 @@ def route_tool(plan, company_id):
 
         logger.info(f"Vehicle detail using vehicle_id {plan.vehicle_id}: {validated_result}")
 
-        return data_formatter(validated_result)
+        return format_operation_summary(validated_result)

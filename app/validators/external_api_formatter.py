@@ -1,34 +1,49 @@
-import re
 from typing import Any
-from app.utils.logger import logger
 
 
-def data_formatter(result: dict[str, Any]):
+def format_operation_summary(result: dict[str, Any]) -> str:
 
-    if isinstance(result, dict):
-        logger.info(f"\n\n Vehicle Details from data formatter: {result}")
-    
-        if not result:
-            return "Sorry, I couldn't fetch vehicle details."
+    if not result:
+        return "No operation data available."
 
-        return f"""
-    Vehicle Details:
+    summary = result.get("summary", {})
+    rows = result.get("dataRows", [])
 
-    • Vehicle type: {result.get("Vehicletype")}
-    • Group ID : {result.get("GroupID")}
-    • Group Name: {result.get("GroupName")}
-    • Plate Number: {result.get("NumberPlate")}
-    • IMEI number: {result.get("IMEI")}
+    if not summary:
+        return "Operation summary not available."
+
+    # -----------------------------
+    # SUMMARY BLOCK
+    # -----------------------------
+    response = f"""
+Operation Summary:
+
+• Total Distance: {summary.get("totalDistance", "N/A")} km
+• Total Moving Time: {summary.get("totalMovingTime", "N/A")}
+• Total Idle Time: {summary.get("totalIdleTime", "N/A")}
+• Total Stop Time: {summary.get("totalStopTime", "N/A")}
+• Engine Hours: {summary.get("totalEngineHours", "N/A")}
 """
-    
-    else:
-        return "Result is not instance of list"
-    
 
-def extract_imei_from_query(query: str):
-    match = re.search(r"\b\d{15}\b", query)
-    return match.group() if match else None
+    # -----------------------------
+    # OPTIONAL: DAILY BREAKDOWN
+    # -----------------------------
+    if rows:
+        response += "\nDaily Breakdown:\n"
 
+        for row in rows[:5]:  # limit to avoid long responses
+            response += f"""
+• {row.get("Date")}:
+  - Distance: {row.get("distance")} km
+  - Moving: {row.get("movingTimeFormated")}
+  - Idle: {row.get("idleTimeFormated")}
+  - Stop: {row.get("stopTimeFormated")}
+"""
+
+        if len(rows) > 5:
+            response += "\n...and more days."
+
+    return response.strip()
 
 
 # {'ID': 117, 'Name': '102', 'DepartmentID': None,

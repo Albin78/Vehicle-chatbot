@@ -35,10 +35,10 @@ def extract_intent(query: str) -> QueryIntent :
     prompt = f"""
 You are a JSON extractor.
 
-Your job is to FILL values into a FIXED JSON structure.
+Your job is to extract values from a user query into a FIXED JSON structure.
 
 ----------------------------------------
-OUTPUT (COPY EXACTLY):
+OUTPUT FORMAT (STRICT):
 
 {{
   "action": "",
@@ -51,13 +51,14 @@ OUTPUT (COPY EXACTLY):
 }}
 
 ----------------------------------------
-RULES (STRICT):
+RULES:
 
-- ONLY fill values
-- DO NOT add new keys
-- DO NOT output "imei"
-- DO NOT output anything outside JSON
+- Output ONLY valid JSON
+- Do NOT explain anything
+- Do NOT add extra keys
 - Use null (not "null")
+- Extract values when clearly present
+- Do NOT overthink — simple extraction
 
 ----------------------------------------
 INPUT:
@@ -68,73 +69,100 @@ VALID METRICS:
 {fields}
 
 ----------------------------------------
-FILLING RULES:
-
 1. ACTION:
-- if "delete" → "delete"
-- if "update" → "update"
-- else → "fetch"
+
+- If query contains "delete" → "delete"
+- If query contains "update" → "update"
+- Otherwise → "fetch"
 
 ----------------------------------------
-2. VEHICLE ID (MANDATORY - TOP PRIORITY)
+2. VEHICLE ID (HIGH PRIORITY):
 
-Search for EXACT text:
+Extract vehicle identifier if present.
 
-"vehicle id"
-"vehicle number"
-"vehicle_id"
+Look for patterns like:
+- "vehicle id <value>"
+- "vehicle number <value>"
+- "vehicle <value>"
+- "id <value>"
+- "for <value>"
+- "of <value>"
 
-IF FOUND:
-- Take EVERYTHING after it
-- Keep exact text (case + spaces)
-
-Example:
-"vehicle id 33 AZS" → "33 AZS"
-
-CRITICAL:
-- If phrase exists → vehicle_id MUST NOT be null
-- Returning null is WRONG
+IMPORTANT:
+- Vehicle ID can contain letters, numbers, and spaces
+- Example: "4672 J R B", "33 AZS", "7895 CCC"
+- Extract FULL value after keyword
+- DO NOT return null if a vehicle is clearly mentioned
 
 ----------------------------------------
 3. METRIC:
 
 - Match ONLY exact words from VALID METRICS
-- DO NOT use:
-  vehicle, vehicle id, vehicle number
+- Example: speed, battery_level, idle_time
+- If not present → null
 
 ----------------------------------------
 4. AGGREGATION:
 
-- min/minimum → "minimum"
-- max/maximum → "maximum"
-- avg/average → "average"
+- "minimum" or "min" → "minimum"
+- "maximum" or "max" → "maximum"
+- "average" or "avg" → "average"
+- Else → null
 
 ----------------------------------------
-5. SERVICE:
+5. TIME RANGE:
 
-IF vehicle_id != null AND metric == null:
-→ "vehicle_service"
+Extract if present.
 
-ELSE:
-→ null
+KEYWORDS:
+- "today" → "today"
+- "yesterday" → "yesterday"
+- "last week" → "last_week"
+- "last X days" → "last_X_days"
+
+DATE RANGE:
+- "from <date> to <date>"
+- "between <date> and <date>"
+
+Examples:
+- "from April 1 to April 10"
+- "between 2026-04-01 and 2026-04-10"
+
+Return the FULL text span.
 
 ----------------------------------------
-6. TIME RANGE:
+6. SERVICE:
 
-- today → "today"
-- yesterday → "yesterday"
-- last week → "last_week"
+Always return null.
 
 ----------------------------------------
-7. ANALYSIS:
+EXAMPLES:
 
-Always null unless clearly present
+Query: Fetch details of vehicle with id 4672 J R B
+Output:
+{{
+  "action": "fetch",
+  "vehicle_id": "4672 J R B",
+  "metric": null,
+  "aggregation": null,
+  "analysis": null,
+  "time_range": null,
+  "service": null
+}}
 
-----------------------------------------
-VALID EXAMPLE:
+Query: Show speed of vehicle 7895 CCC today
+Output:
+{{
+  "action": "fetch",
+  "vehicle_id": "7895 CCC",
+  "metric": "speed",
+  "aggregation": null,
+  "analysis": null,
+  "time_range": "today",
+  "service": null
+}}
 
-Query: Fetch details of vehicle with vehicle id 33 AZS
-
+Query: Get data for vehicle 33 AZS from April 1 to April 10
 Output:
 {{
   "action": "fetch",
@@ -142,8 +170,8 @@ Output:
   "metric": null,
   "aggregation": null,
   "analysis": null,
-  "time_range": null,
-  "service": "vehicle_service"
+  "time_range": "from April 1 to April 10",
+  "service": null
 }}
 
 ----------------------------------------
@@ -159,7 +187,7 @@ RETURN ONLY JSON
     # Extract JSON block
     # json_match = re.search(r"\{.*\}", response, re.DOTALL)
     # json_match = re.findall(r"\{.*?\}", response, re.DOTALL)
-    json_match = re.search(r"\{.*\}", response, re.DOTALL)
+    json_match = re.search(r"\{[\s\S]*?\}", response)
 
     if not json_match:
         logger.error(f"No JSON found. Raw response: {response}")
@@ -170,8 +198,21 @@ RETURN ONLY JSON
     logger.info(f"Query: {query}")
     logger.info(f"JSON response: {json_str}")
 
-    data = json.loads(json_str)
-    logger.info(f"JSON data: {data}")
+    try:
+        data = json.loads(json_str)
+        logger.info(f"JSON data: {data}")
+
+    except Exception:
+      logger.error("JSON parsing failed")
+      data = {
+          "action": "fetch",
+          "vehicle_id": None,
+          "metric": None,
+          "aggregation": None,
+          "analysis": None,
+          "time_range": None,
+          "service": None
+      }
 
     return QueryIntent(**data)
     

@@ -18,6 +18,6 @@ def resolve_vehicle(vehicle_id: str, company_id: int):
 
     return {
         "imei": vehicle.get("IMEI"),
-        "ID": vehicle.get("VehicleID"),
+        "ID": vehicle.get("ID"),
         "vehicle_id": vehicle.get("NumberPlate")
     }

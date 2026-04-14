@@ -25,3 +25,4 @@ motor==3.5.2
 pydantic-settings==2.5.2
 numpy==2.2.5
 streamlit
+dateparser==1.2.0

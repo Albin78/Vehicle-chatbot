@@ -36,7 +36,6 @@ def query_system(data: QueryRequest):
     if action_validation["type"] == "error":
         return {"response": action_validation["message"]}
 
-    # -----------------------------
     # NEW: RESOLVE VEHICLE
     # -----------------------------
     vehicle_context = None
@@ -50,12 +49,10 @@ def query_system(data: QueryRequest):
     imei = vehicle_context["imei"] if vehicle_context else None
     vehicle_id = vehicle_context["vehicle_id"] if vehicle_context else None
 
-    # -----------------------------
     # PLAN
     # -----------------------------
     plan = create_plan(intent, imei=imei, vehicle_id=vehicle_id)
 
-    # -----------------------------
     # EXECUTION
     # -----------------------------
     result = route_tool(plan, company_id)
