@@ -141,37 +141,13 @@ EXAMPLES:
 Query: Fetch details of vehicle with id 4672 J R B
 Output:
 {{
-  "action": "fetch",
-  "vehicle_id": "4672 J R B",
-  "metric": null,
-  "aggregation": null,
-  "analysis": null,
-  "time_range": null,
-  "service": null
-}}
-
-Query: Show speed of vehicle 7895 CCC today
-Output:
-{{
-  "action": "fetch",
-  "vehicle_id": "7895 CCC",
-  "metric": "speed",
-  "aggregation": null,
-  "analysis": null,
-  "time_range": "today",
-  "service": null
-}}
-
-Query: Get data for vehicle 33 AZS from April 1 to April 10
-Output:
-{{
-  "action": "fetch",
-  "vehicle_id": "33 AZS",
-  "metric": null,
-  "aggregation": null,
-  "analysis": null,
-  "time_range": "from April 1 to April 10",
-  "service": null
+"action": "fetch",
+"vehicle_id": "4672 J R B",
+"metric": null,
+"aggregation": null,
+"analysis": null,
+"time_range": null,
+"service": null
 }}
 
 ----------------------------------------

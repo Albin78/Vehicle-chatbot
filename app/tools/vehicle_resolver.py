@@ -1,5 +1,6 @@
 from app.tools.vehicle_cache import get_vehicle_from_cache
 from app.utils.logger import logger
+from typing import Optional
 
 
 def resolve_vehicle(vehicle_id: str, company_id: int):

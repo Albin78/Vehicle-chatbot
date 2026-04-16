@@ -3,12 +3,12 @@ from app.tools.analytics_tool import run_analytics
 from app.tools.vehicle_resolver import resolve_vehicle
 from app.tools.external_api_tool import get_operation_summary
 from app.utils.dateparser import parse_time_range
-from app.validators.external_api_formatter import format_operation_summary
+from app.validators.external_api_formatter import build_response
 from app.utils.logger import logger
 from app.validators.result_validator import validate_api_response
 
 
-def route_tool(plan, company_id):
+def route_tool(intent, plan, company_id):
 
     if plan.tool == "db":
         return fetch_telemetry(plan.imei, plan.metric)
@@ -29,7 +29,7 @@ def route_tool(plan, company_id):
         from_date, to_date = parse_time_range(plan.time_range)
 
         if not vehicle_detail:
-            return {"response": "Vehicle not found"}
+            return {"response": "Vehicle not found. Check if you passed the vehicle id or not."}
 
         # Safe after this point
         id = vehicle_detail["ID"]
@@ -52,4 +52,4 @@ def route_tool(plan, company_id):
 
         logger.info(f"Vehicle detail using vehicle_id {plan.vehicle_id}: {validated_result}")
 
-        return format_operation_summary(validated_result)
+        return build_response(intent, validated_result)

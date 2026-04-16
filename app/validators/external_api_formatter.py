@@ -1,55 +1,105 @@
-from typing import Any
+import numpy as np
 
 
-def format_operation_summary(result: dict[str, Any]) -> str:
+def build_execution_plan(intent):
 
-    if not result:
-        return "No operation data available."
+    return {
+        "need_vehicle": intent.vehicle_id is not None,
+        "need_summary": intent.metric is None and intent.time_range is not None,
+        "need_metric": intent.metric is not None,
+        "metric": intent.metric,
+        "aggregation": intent.aggregation
+    }
 
-    summary = result.get("summary", {})
-    rows = result.get("dataRows", [])
 
-    if not summary:
-        return "Operation summary not available."
 
+def compute_metric(rows, metric, aggregation=None):
+    if not rows:
+        return None
+
+    if metric == "speed":
+        values = [r.get("maxSpeed", 0) for r in rows]
+
+    elif metric == "distance":
+        values = [float(r.get("distance", 0)) for r in rows]
+
+    elif metric == "idleTime":
+        values = [r.get("idleTime", 0) for r in rows]
+
+    else:
+        return None
+
+    if not values:
+        return None
+
+    if aggregation == "maximum":
+        return max(values)
+
+    elif aggregation == "minimum":
+        return min(values)
+
+    elif aggregation == "average":
+        return sum(values) / len(values)
+
+    else:
+        return values[-1]  
+    
+
+
+
+def extract_summary(summary):
+    return {
+        "total_distance": summary.get("totalDistance"),
+        "total_moving_time": summary.get("totalMovingTime"),
+        "total_idle_time": summary.get("totalIdleTime"),
+        "total_stop_time": summary.get("totalStopTime"),
+        "engine_hours": summary.get("totalEngineHours")
+    }
+
+
+def compute_derived(rows):
+    speeds = [row.get("maxSpeed", 0) for row in rows]
+    averages = [r.get("maxSpeed", 0) for r in rows]
+    return {
+        "max_speed": max(speeds, default=0),
+        "average_speed": np.mean(averages)
+    }
+
+
+
+def build_response(intent, api_result):
+
+    rows = api_result.get("dataRows", [])
+    summary = api_result.get("summary", {})
+
+    plan = build_execution_plan(intent)
+
+    
+    # CASE 1: METRIC QUERY
     # -----------------------------
-    # SUMMARY BLOCK
+    if plan["need_metric"]:
+        value = compute_metric(rows, plan["metric"], plan["aggregation"])
+
+        return {
+            "type": "metric",
+            "metric": plan["metric"],
+            "aggregation": plan["aggregation"] or "current",
+            "value": value
+        }
+
+    
+    # CASE 2: DETAILS QUERY
     # -----------------------------
-    response = f"""
-Operation Summary:
+    response = {
+        "type": "summary",
+        "vehicle_type": rows[0].get("type"),
+        "group": rows[0].get("groupName")
+    }
 
-• Total Distance: {summary.get("totalDistance", "N/A")} km
-• Total Moving Time: {summary.get("totalMovingTime", "N/A")}
-• Total Idle Time: {summary.get("totalIdleTime", "N/A")}
-• Total Stop Time: {summary.get("totalStopTime", "N/A")}
-• Engine Hours: {summary.get("totalEngineHours", "N/A")}
-"""
+    if plan["need_summary"]:
+        response.update(extract_summary(summary))
 
-    # -----------------------------
-    # OPTIONAL: DAILY BREAKDOWN
-    # -----------------------------
-    if rows:
-        response += "\nDaily Breakdown:\n"
+    # Add derived insights ALWAYS for details
+    response.update(compute_derived(rows))
 
-        for row in rows[:5]:  # limit to avoid long responses
-            response += f"""
-• {row.get("Date")}:
-  - Distance: {row.get("distance")} km
-  - Moving: {row.get("movingTimeFormated")}
-  - Idle: {row.get("idleTimeFormated")}
-  - Stop: {row.get("stopTimeFormated")}
-"""
-
-        if len(rows) > 5:
-            response += "\n...and more days."
-
-    return response.strip()
-
-
-# {'ID': 117, 'Name': '102', 'DepartmentID': None,
-#   'TypeID': 11, 'IMEI': '868963040927576', 
-#   'NumberPlate': '4672 J R B', 'VIN': None, 
-#   'GroupID': 34, 'CreatedDate': '2022-05-26T00:00:00.000Z', 
-#   'Status': '1', 'GroupName': 'Sales Team, Sales Team 2024', 
-#   'Vehicletype': 'Truck', 'lastUpdatedTime': '2026-03-16T07:36:29.000Z', 
-#   'TankerEquipmentNumber': None}
+    return response

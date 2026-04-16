@@ -22,11 +22,15 @@ def query_system(data: QueryRequest):
 
     if not company_id:
         return {"response": "Please provide company id."}
+    
 
     intent = extract_intent(data.query)
 
     logger.info(f"Intent: {intent}")
     logger.info(f"Intent vehicle id: {intent.vehicle_id}")
+
+    if not intent.vehicle_id:
+        return "Please provide a vehicle ID to proceed."
 
     intent_validation = validate_intent(intent)
     if intent_validation["type"] == "error":
@@ -55,7 +59,7 @@ def query_system(data: QueryRequest):
 
     # EXECUTION
     # -----------------------------
-    result = route_tool(plan, company_id)
+    result = route_tool(intent, plan, company_id)
 
     logger.info(f"Final result before validation: {result}, type: {type(result)}")
 

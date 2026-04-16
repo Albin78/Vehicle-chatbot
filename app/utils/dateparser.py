@@ -1,42 +1,72 @@
-from datetime import datetime
 import re
-from dateutil import parser
+from datetime import datetime, timedelta
+import dateparser
 
 
-def parse_time_range(time_range: str):
-    if not time_range:
-        return None, None
+def normalize_time_text(text: str) -> str:
+    return text.lower().strip()
+
+
+
+def parse_time_range(text: str):
+    text = normalize_time_text(text)
 
     now = datetime.now()
 
-    try:
-        # CASE 1: from X to Y
-        match = re.search(r"from (.+?) to (.+)", time_range)
-        if match:
-            start_raw = match.group(1)
-            end_raw = match.group(2)
+    # -----------------------------
+    # CASE 1: between X and Y
+    # -----------------------------
+    match = re.search(r"between (.+?) and (.+)", text)
+    if match:
+        start_str, end_str = match.groups()
 
-            start_date = parser.parse(start_raw, default=now)
-            end_date = parser.parse(end_raw, default=now)
+        start = dateparser.parse(start_str)
+        end = dateparser.parse(end_str)
 
-            return start_date, end_date
+        if start and end:
+            return start, end
 
-        # CASE 2: since X
-        match = re.search(r"(since|from) (.+)", time_range)
-        if match:
-            start_date = parser.parse(match.group(2), default=now)
-            return start_date, now
+    # -----------------------------
+    # CASE 2: from X to Y
+    # -----------------------------
+    match = re.search(r"from (.+?) to (.+)", text)
+    if match:
+        start_str, end_str = match.groups()
 
-        # CASE 3: today
-        if "today" in time_range:
-            return now, now
+        start = dateparser.parse(start_str)
+        end = dateparser.parse(end_str)
 
-        # CASE 4: yesterday
-        if "yesterday" in time_range:
-            y = now.replace(day=now.day - 1)
-            return y, y
+        if start and end:
+            return start, end
 
-    except Exception as e:
-        print("Date parsing error:", e)
+    # -----------------------------
+    # CASE 3: since X → till today
+    # -----------------------------
+    match = re.search(r"(since|from) (.+)", text)
+    if match:
+        start_str = match.group(2)
 
-    return None, None
+        start = dateparser.parse(start_str)
+        if start:
+            return start, now
+
+    # -----------------------------
+    # CASE 4: last X days
+    # -----------------------------
+    match = re.search(r"last (\d+) days", text)
+    if match:
+        days = int(match.group(1))
+        return now - timedelta(days=days), now
+
+    # -----------------------------
+    # FALLBACK (IMPORTANT)
+    # -----------------------------
+    parsed = dateparser.parse(text)
+
+    if parsed:
+        return parsed, parsed
+
+    # -----------------------------
+    # FINAL FAIL-SAFE (CRITICAL)
+    # -----------------------------
+    return now.replace(hour=0, minute=0, second=0), now
