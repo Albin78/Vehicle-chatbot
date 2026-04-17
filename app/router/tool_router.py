@@ -39,8 +39,8 @@ def route_tool(intent, plan, company_id):
         result = get_operation_summary(
             id=id, 
             company_id=company_id,
-            from_date=from_date,
-            to_date=to_date
+            from_date=from_date, # type: ignore
+            to_date=to_date      # type: ignore
         )
 
         validation = validate_api_response(result)

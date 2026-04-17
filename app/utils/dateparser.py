@@ -4,51 +4,68 @@ import dateparser
 
 
 def normalize_time_text(text: str) -> str:
-    return text.lower().strip()
-
+    if text:
+        return text.lower().strip()
+    return "Date is not fetched"
 
 
 def parse_time_range(text: str):
     text = normalize_time_text(text)
-
     now = datetime.now()
 
-    # -----------------------------
-    # CASE 1: between X and Y
-    # -----------------------------
-    match = re.search(r"between (.+?) and (.+)", text)
-    if match:
-        start_str, end_str = match.groups()
-
-        start = dateparser.parse(start_str)
-        end = dateparser.parse(end_str)
-
-        if start and end:
-            return start, end
+    settings = {
+        "PREFER_DATES_FROM": "current_period",
+        "RELATIVE_BASE": now,
+    }
 
     # -----------------------------
-    # CASE 2: from X to Y
+    # CASE 1: "from X to Y"
     # -----------------------------
     match = re.search(r"from (.+?) to (.+)", text)
     if match:
         start_str, end_str = match.groups()
 
-        start = dateparser.parse(start_str)
-        end = dateparser.parse(end_str)
+        start = dateparser.parse(start_str, settings=settings)  # type: ignore
+
+        if start and not re.search(r"[a-zA-Z]", end_str):
+            end_str = start.strftime("%B") + " " + end_str
+
+        end = dateparser.parse(end_str, settings=settings)   # type: ignore
 
         if start and end:
-            return start, end
+            return finalize_dates(start, end, now)
 
     # -----------------------------
-    # CASE 3: since X → till today
+    # CASE 2: "april 1-10"
     # -----------------------------
-    match = re.search(r"(since|from) (.+)", text)
+    match = re.search(r"([a-zA-Z]+)\s*(\d{1,2})\s*[-]\s*(\d{1,2})", text)
     if match:
-        start_str = match.group(2)
+        month, start_day, end_day = match.groups()
 
-        start = dateparser.parse(start_str)
-        if start:
-            return start, now
+        start_str = f"{month} {start_day}"
+        end_str = f"{month} {end_day}"
+
+        start = dateparser.parse(start_str, settings=settings)  # type: ignore
+        end = dateparser.parse(end_str, settings=settings)     # type: ignore
+
+        if start and end:
+            return finalize_dates(start, end, now)
+
+    # -----------------------------
+    # CASE 3: "april 1 to 10"
+    # -----------------------------
+    match = re.search(r"([a-zA-Z]+)\s*(\d{1,2})\s*(to)\s*(\d{1,2})", text)
+    if match:
+        month, start_day, _, end_day = match.groups()
+
+        start_str = f"{month} {start_day}"
+        end_str = f"{month} {end_day}"
+
+        start = dateparser.parse(start_str, settings=settings)   # type: ignore
+        end = dateparser.parse(end_str, settings=settings)       # type: ignore
+ 
+        if start and end:
+            return finalize_dates(start, end, now)
 
     # -----------------------------
     # CASE 4: last X days
@@ -56,17 +73,32 @@ def parse_time_range(text: str):
     match = re.search(r"last (\d+) days", text)
     if match:
         days = int(match.group(1))
-        return now - timedelta(days=days), now
+        start = now - timedelta(days=days)
+        end = now
+        return format_dates(start, end)
 
     # -----------------------------
-    # FALLBACK (IMPORTANT)
+    # FALLBACK
     # -----------------------------
-    parsed = dateparser.parse(text)
+    parsed = dateparser.parse(text, settings=settings)  # type: ignore
 
     if parsed:
-        return parsed, parsed
+        return format_dates(parsed, parsed)
 
-    # -----------------------------
-    # FINAL FAIL-SAFE (CRITICAL)
-    # -----------------------------
-    return now.replace(hour=0, minute=0, second=0), now
+    return None, None
+
+
+
+
+def finalize_dates(start, end, now):
+    start = start.replace(year=now.year)
+    end = end.replace(year=now.year)
+
+    return format_dates(start, end)
+
+
+def format_dates(start, end):
+    return (
+        start.strftime("%Y-%m-%d"),
+        end.strftime("%Y-%m-%d")
+    )

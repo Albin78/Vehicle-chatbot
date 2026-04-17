@@ -9,188 +9,232 @@ from app.utils.logger import logger
 llm = OllamaClient()
 
 
+# --------------------------------------------------
+# DEFAULT SAFE INTENT (FALLBACK)
+# --------------------------------------------------
+DEFAULT_INTENT = {
+    "action": "fetch",
+    "vehicle_id": None,
+    "metric": None,
+    "aggregation": None,
+    "analysis": None,
+    "time_range": None,
+    "service": None
+}
+
+
+# --------------------------------------------------
+# FETCH DB FIELDS (FOR METRIC CONTROL)
+# --------------------------------------------------
 def get_db_fields():
 
     collection = get_collection()
-    print(f"The mongo collection: {collection}")
+    logger.info(f"Mongo collection: {collection}")
 
     sample = collection.find_one()
-    print(f"Sample from mongo: {sample}")
 
-    if sample is None:
+    if not sample:
         logger.warning("No documents found in collection")
         return []
 
     excluded = {"_id", "imei", "date", "sensor"}
-
     fields = [k for k in sample.keys() if k not in excluded]
 
     return fields
 
 
-def extract_intent(query: str) -> QueryIntent :  
+# --------------------------------------------------
+# SANITIZE LLM OUTPUT (CRITICAL)
+# --------------------------------------------------
+def sanitize_llm_output(raw: str) -> dict:
+    """
+    Extract and sanitize JSON from LLM output.
+    Handles:
+    - Extra text
+    - Broken JSON
+    - Nested structures
+    - Hallucinated fields
+    """
+
+    if not raw:
+        return DEFAULT_INTENT
+
+    try:
+        # Extract FIRST valid JSON block (greedy safe)
+        match = re.search(r"\{[\s\S]*\}", raw)
+
+        if not match:
+            logger.error(f"No JSON found in response: {raw}")
+            return DEFAULT_INTENT
+
+        json_str = match.group()
+
+        data = json.loads(json_str)
+
+    except Exception as e:
+        logger.error(f"JSON parsing failed: {e}")
+        return DEFAULT_INTENT
+
+    # -----------------------------
+    # HARD VALIDATION LAYER
+    # -----------------------------
+    clean_data = {}
+
+    for key in DEFAULT_INTENT.keys():
+
+        value = data.get(key, None)
+
+        # Reject nested objects or lists
+        if isinstance(value, (dict, list)):
+            logger.warning(f"Invalid nested value for {key}: {value}")
+            value = None
+
+        # Normalize null-like strings
+        if isinstance(value, str) and value.strip().lower() in {"null", "none", ""}:
+            value = None
+
+        clean_data[key] = value
+
+    return clean_data
+
+
+# --------------------------------------------------
+# INTENT EXTRACTION
+# --------------------------------------------------
+def extract_intent(query: str) -> QueryIntent:
 
     fields = get_db_fields()
 
     prompt = f"""
-You are a JSON extractor.
+You are a STRICT JSON extractor.
 
-Your job is to extract values from a user query into a FIXED JSON structure.
+You MUST return ONLY ONE valid JSON object.
 
 ----------------------------------------
-OUTPUT FORMAT (STRICT):
+SCHEMA (STRICT):
 
 {{
-  "action": "",
-  "vehicle_id": null,
-  "metric": null,
-  "aggregation": null,
-  "analysis": null,
-  "time_range": null,
+  "action": "fetch | update | delete",
+  "vehicle_id": string | null,
+  "metric": string | null,
+  "aggregation": "minimum" | "maximum" | "average" | null,
+  "analysis": string | null,
+  "time_range": string | null,
   "service": null
 }}
 
 ----------------------------------------
-RULES:
+CRITICAL RULES (DO NOT VIOLATE):
 
-- Output ONLY valid JSON
-- Do NOT explain anything
-- Do NOT add extra keys
-- Use null (not "null")
-- Extract values when clearly present
-- Do NOT overthink — simple extraction
+- Output MUST be valid JSON
+- NO explanation
+- NO extra text
+- NO markdown
+- NO multiple JSON blocks
+- NO additional keys (STRICTLY FORBIDDEN)
+- NO nested objects
+- NO arrays
 
-----------------------------------------
-INPUT:
+VALID OUTPUT EXAMPLE:
 
-Query: {query}
-
-VALID METRICS:
-{fields}
-
-----------------------------------------
-1. ACTION:
-
-- If query contains "delete" → "delete"
-- If query contains "update" → "update"
-- Otherwise → "fetch"
-
-----------------------------------------
-2. VEHICLE ID (HIGH PRIORITY):
-
-Extract vehicle identifier if present.
-
-Look for patterns like:
-- "vehicle id <value>"
-- "vehicle number <value>"
-- "vehicle <value>"
-- "id <value>"
-- "for <value>"
-- "of <value>"
-
-IMPORTANT:
-- Vehicle ID can contain letters, numbers, and spaces
-- Example: "4672 J R B", "33 AZS", "7895 CCC"
-- Extract FULL value after keyword
-- DO NOT return null if a vehicle is clearly mentioned
-
-----------------------------------------
-3. METRIC:
-
-- Match ONLY exact words from VALID METRICS
-- Example: speed, battery_level, idle_time
-- If not present → null
-
-----------------------------------------
-4. AGGREGATION:
-
-- "minimum" or "min" → "minimum"
-- "maximum" or "max" → "maximum"
-- "average" or "avg" → "average"
-- Else → null
-
-----------------------------------------
-5. TIME RANGE:
-
-Extract if present.
-
-KEYWORDS:
-- "today" → "today"
-- "yesterday" → "yesterday"
-- "last week" → "last_week"
-- "last X days" → "last_X_days"
-
-DATE RANGE:
-- "from <date> to <date>"
-- "between <date> and <date>"
-
-Examples:
-- "from April 1 to April 10"
-- "between 2026-04-01 and 2026-04-10"
-
-Return the FULL text span.
-
-----------------------------------------
-6. SERVICE:
-
-Always return null.
-
-----------------------------------------
-EXAMPLES:
-
-Query: Fetch details of vehicle with id 4672 J R B
-Output:
 {{
-"action": "fetch",
-"vehicle_id": "4672 J R B",
-"metric": null,
-"aggregation": null,
-"analysis": null,
-"time_range": null,
-"service": null
+  "action": "fetch",
+  "vehicle_id": "4673 J R B",
+  "metric": "speed",
+  "aggregation": "maximum",
+  "analysis": null,
+  "time_range": "april 1 to 10",
+  "service": null
 }}
 
 ----------------------------------------
+INVALID OUTPUT EXAMPLES (DO NOT DO THIS):
 
-RETURN ONLY JSON
+❌ {{"vehicle_id": {{"value": "4673"}}}}
+❌ {{"data": {{...}}}}
+❌ Any extra keys
+❌ Multiple JSON objects
+
+----------------------------------------
+ACTION:
+
+- "delete" → delete
+- "update" → update
+- else → fetch
+
+----------------------------------------
+VEHICLE ID:
+
+Extract ONLY the value after:
+- vehicle
+- vehicle id
+- vehicle number
+- id
+
+Example:
+"vehicle 4673 J R B" → "4673 J R B"
+
+----------------------------------------
+METRIC + AGGREGATION:
+
+VALID BASE METRICS:
+{fields}
+
+RULES:
+
+1. If metric word appears EXACTLY → use it
+2. If phrase like:
+   - "top speed", "highest speed"
+     → metric = "speed"
+     → aggregation = "maximum"
+
+3. ONLY map if base word exists (e.g., "speed")
+
+4. If unclear → metric = null
+
+----------------------------------------
+TIME RANGE:
+
+Normalize:
+- "april 1-10"
+- "between april 1 and 10"
+
+→ "april 1 to 10"
+
+----------------------------------------
+SERVICE:
+
+Always null
+
+----------------------------------------
+INPUT:
+{query}
+
+----------------------------------------
+OUTPUT:
+Return ONLY JSON.
 """
 
+    raw_response = llm.generate(prompt)
 
-    response = llm.generate(prompt)
+    logger.info(f"Raw LLM Response: {raw_response}")
 
-    logger.info(f"Raw LLM Response: {response}")
+    # -----------------------------
+    # SANITIZE OUTPUT
+    # -----------------------------
+    clean_data = sanitize_llm_output(raw_response)
 
-    # Extract JSON block
-    # json_match = re.search(r"\{.*\}", response, re.DOTALL)
-    # json_match = re.findall(r"\{.*?\}", response, re.DOTALL)
-    json_match = re.search(r"\{[\s\S]*?\}", response)
+    logger.info(f"Sanitized JSON: {clean_data}")
 
-    if not json_match:
-        logger.error(f"No JSON found. Raw response: {response}")
-        raise ValueError("No JSON found in LLM response")
-
-    json_str = json_match.group()
-
-    logger.info(f"Query: {query}")
-    logger.info(f"JSON response: {json_str}")
-
+    # -----------------------------
+    # FINAL INTENT OBJECT
+    # -----------------------------
     try:
-        data = json.loads(json_str)
-        logger.info(f"JSON data: {data}")
+        intent = QueryIntent(**clean_data)
+    except Exception as e:
+        logger.error(f"Pydantic validation failed: {e}")
+        intent = QueryIntent(**DEFAULT_INTENT)
 
-    except Exception:
-      logger.error("JSON parsing failed")
-      data = {
-          "action": "fetch",
-          "vehicle_id": None,
-          "metric": None,
-          "aggregation": None,
-          "analysis": None,
-          "time_range": None,
-          "service": None
-      }
+    logger.info(f"Final Intent: {intent}")
 
-    return QueryIntent(**data)
-    
-
-
+    return intent

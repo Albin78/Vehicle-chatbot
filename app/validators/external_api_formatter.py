@@ -62,7 +62,7 @@ def compute_derived(rows):
     averages = [r.get("maxSpeed", 0) for r in rows]
     return {
         "max_speed": max(speeds, default=0),
-        "average_speed": np.mean(averages)
+        "average_speed": float(np.mean(averages))
     }
 
 
