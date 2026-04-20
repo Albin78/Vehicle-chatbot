@@ -26,16 +26,31 @@ def run_analytics(imei, metric, operation):
         print("Average: ", average)
         # average_in_volt = np.round(average / 1000, 2)
         # print("Average in Volt: ", average_in_volt)
-        return average
+        return {
+            "type": "metric",
+            "metric": metric,
+            "aggregation": operation,
+            "value": average
+        }
 
     if operation == "maximum":
         maximum = np.max(values)
         print("Maximum: ", maximum)
-        return maximum
+        return {
+            "type": "metric",
+            "metric": metric,
+            "aggregation": operation,
+            "value": maximum
+        }
 
     if operation == "minimum":
         minimum = np.min(values)
         print("Minimum: ", minimum)
-        return minimum
+        return {
+            "type": "metric",
+            "metric": metric,
+            "aggregation": operation,
+            "value": minimum
+        }
 
     return None

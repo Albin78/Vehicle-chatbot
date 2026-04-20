@@ -27,7 +27,6 @@ DEFAULT_INTENT = {
 # FETCH DB FIELDS (FOR METRIC CONTROL)
 # --------------------------------------------------
 def get_db_fields():
-
     collection = get_collection()
     logger.info(f"Mongo collection: {collection}")
 
@@ -44,23 +43,62 @@ def get_db_fields():
 
 
 # --------------------------------------------------
-# SANITIZE LLM OUTPUT (CRITICAL)
+# RULE-BASED VEHICLE ID EXTRACTION (STRONG FALLBACK)
+# --------------------------------------------------
+def extract_vehicle_id_rule_based(query: str) -> str | None:
+    """
+    Supports:
+    - 4673 J R B
+    - 6534 AKA
+    - 7894 B B B
+    - 53380 533
+    - 97 J J J
+    """
+
+    query_upper = query.upper()
+
+    # Capture flexible formats
+    pattern = r"\b\d{2,5}(?:\s+[A-Z0-9]){1,4}\b"
+    matches = re.findall(pattern, query_upper)
+
+    if not matches:
+        return None
+
+    raw = matches[0]
+
+    # Normalize → remove spaces
+    normalized = re.sub(r"\s+", "", raw)
+
+    # Final strict validation
+    if not re.match(r"^\d{2,5}[A-Z0-9]{1,4}$", normalized):
+        return None
+
+    return normalized
+
+
+def is_time_range_in_query(query: str) -> bool:
+    query = query.lower()
+
+    patterns = [
+        r"\bbetween\b",
+        r"\bfrom\b",
+        r"\bto\b",
+        r"\b\d{1,2}\b",            
+        r"\bjan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec\b"
+    ]
+
+    return any(re.search(p, query) for p in patterns)
+
+
+# --------------------------------------------------
+# SANITIZE LLM OUTPUT
 # --------------------------------------------------
 def sanitize_llm_output(raw: str) -> dict:
-    """
-    Extract and sanitize JSON from LLM output.
-    Handles:
-    - Extra text
-    - Broken JSON
-    - Nested structures
-    - Hallucinated fields
-    """
 
     if not raw:
         return DEFAULT_INTENT
 
     try:
-        # Extract FIRST valid JSON block (greedy safe)
         match = re.search(r"\{[\s\S]*\}", raw)
 
         if not match:
@@ -68,23 +106,22 @@ def sanitize_llm_output(raw: str) -> dict:
             return DEFAULT_INTENT
 
         json_str = match.group()
-
         data = json.loads(json_str)
+
+        if not isinstance(data, dict):
+            logger.error(f"LLM returned non-dict JSON: {data}")
+            return DEFAULT_INTENT
 
     except Exception as e:
         logger.error(f"JSON parsing failed: {e}")
         return DEFAULT_INTENT
 
-    # -----------------------------
-    # HARD VALIDATION LAYER
-    # -----------------------------
     clean_data = {}
 
     for key in DEFAULT_INTENT.keys():
-
         value = data.get(key, None)
 
-        # Reject nested objects or lists
+        # Reject invalid types
         if isinstance(value, (dict, list)):
             logger.warning(f"Invalid nested value for {key}: {value}")
             value = None
@@ -99,8 +136,71 @@ def sanitize_llm_output(raw: str) -> dict:
 
 
 # --------------------------------------------------
-# INTENT EXTRACTION
+# POST VALIDATION (CRITICAL LAYER)
 # --------------------------------------------------
+def post_validate(clean_data: dict, query: str, fields: list) -> dict:
+
+    # -----------------------------
+    # VEHICLE ID VALIDATION
+    # -----------------------------
+    vid = clean_data.get("vehicle_id")
+
+    if isinstance(vid, str):
+        normalized = re.sub(r"\s+", "", vid.upper())
+
+        if re.match(r"^\d{2,5}[A-Z0-9]{1,4}$", normalized):
+            clean_data["vehicle_id"] = normalized
+        else:
+            logger.warning(f"Rejected invalid vehicle_id: {vid}")
+            clean_data["vehicle_id"] = None
+
+    # FALLBACK (deterministic)
+    if not clean_data.get("vehicle_id"):
+        fallback_vid = extract_vehicle_id_rule_based(query)
+
+        if fallback_vid:
+            logger.info(f"Recovered vehicle_id from query: {fallback_vid}")
+            clean_data["vehicle_id"] = fallback_vid
+
+    # -----------------------------
+    # METRIC VALIDATION
+    # -----------------------------
+    metric = clean_data.get("metric")
+
+    if isinstance(metric, str):
+        metric = metric.strip().lower()
+
+        if metric not in fields:
+            logger.warning(f"Rejected invalid metric: {metric}")
+            clean_data["metric"] = None
+        else:
+            clean_data["metric"] = metric
+
+    # -----------------------------
+    # AGGREGATION VALIDATION
+    # -----------------------------
+    if clean_data.get("aggregation") and not clean_data.get("metric"):
+        clean_data["aggregation"] = None
+
+    # -----------------------------
+    # TIME RANGE NORMALIZATION
+    # -----------------------------
+    tr = clean_data.get("time_range")
+
+    if isinstance(tr, str):
+        tr = tr.lower().strip()
+
+        # Normalize patterns
+        tr = re.sub(r"between (.+?) and (.+)", r"\1 to \2", tr)
+        tr = re.sub(r"from (.+?) to (.+)", r"\1 to \2", tr)
+        tr = re.sub(r"(\w+ \d+)-(\d+)", r"\1 to \2", tr)
+
+        clean_data["time_range"] = tr
+
+    return clean_data
+
+
+# INTENT EXTRACTION
 def extract_intent(query: str) -> QueryIntent:
 
     fields = get_db_fields()
@@ -163,16 +263,29 @@ ACTION:
 - else → fetch
 
 ----------------------------------------
-VEHICLE ID:
+VEHICLE ID (STRICT HARD RULE)
 
-Extract ONLY the value after:
-- vehicle
-- vehicle id
-- vehicle number
-- id
+A vehicle ID MUST follow this pattern:
 
-Example:
-"vehicle 4673 J R B" → "4673 J R B"
+- Starts with 2–5 digits
+- Followed by 1–4 uppercase letters
+- May contain spaces
+
+VALID:
+"4673 J R B"
+"6534 AKA"
+"7894 B B B"
+
+INVALID:
+"iphone price"
+"vehicle details"
+"speed report"
+
+RULES:
+
+- If pattern NOT found → return null
+- DO NOT guess
+- DO NOT extract random phrases
 
 ----------------------------------------
 METRIC + AGGREGATION:
@@ -182,24 +295,39 @@ VALID BASE METRICS:
 
 RULES:
 
-1. If metric word appears EXACTLY → use it
-2. If phrase like:
-   - "top speed", "highest speed"
-     → metric = "speed"
-     → aggregation = "maximum"
+1. Metric MUST match EXACT word from list
 
-3. ONLY map if base word exists (e.g., "speed")
+2. IGNORE context words like:
+   - report
+   - details
+   - summary
+   - data
 
-4. If unclear → metric = null
+3. Valid examples:
+   "speed report" → metric = "speed"
+   "vehicle details" → metric = null
+
+4. Allowed mappings:
+   - "top speed" → speed + maximum
+   - "highest speed" → speed + maximum
+
+5. If unclear → metric = null
 
 ----------------------------------------
-TIME RANGE:
+TIME RANGE (STRICT)
 
-Normalize:
-- "april 1-10"
-- "between april 1 and 10"
+Extract ONLY if explicitly present in query.
 
-→ "april 1 to 10"
+VALID examples:
+- "april 1-10" → "april 1 to 10"
+- "between april 1 and 10" → "april 1 to 10"
+
+RULES:
+
+- If NO date/time mentioned → MUST return null
+- DO NOT infer
+- DO NOT guess
+- DO NOT reuse example values
 
 ----------------------------------------
 SERVICE:
@@ -223,8 +351,24 @@ Return ONLY JSON.
     # SANITIZE OUTPUT
     # -----------------------------
     clean_data = sanitize_llm_output(raw_response)
+    clean_data = post_validate(clean_data, query, fields)
 
-    logger.info(f"Sanitized JSON: {clean_data}")
+    logger.info(f"After post validation JSON: {clean_data}")
+    
+    tr = clean_data.get("time_range")
+
+    if isinstance(tr, str):
+        if not is_time_range_in_query(query):
+            logger.warning(f"Removed hallucinated time_range: {tr}")
+            clean_data["time_range"] = None
+        else:
+            tr = tr.lower().strip()
+
+            tr = re.sub(r"between (.+?) and (.+)", r"\1 to \2", tr)
+            tr = re.sub(r"from (.+?) to (.+)", r"\1 to \2", tr)
+            tr = re.sub(r"(\w+ \d+)-(\d+)", r"\1 to \2", tr)
+
+            clean_data["time_range"] = tr
 
     # -----------------------------
     # FINAL INTENT OBJECT
@@ -236,5 +380,6 @@ Return ONLY JSON.
         intent = QueryIntent(**DEFAULT_INTENT)
 
     logger.info(f"Final Intent: {intent}")
+    logger.info(f"Type of intent: {type(intent)}")
 
     return intent

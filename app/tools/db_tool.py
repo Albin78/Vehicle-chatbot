@@ -13,6 +13,11 @@ def fetch_telemetry(imei, metric):
     logger.info(f"Result: {result}")
     # print("Result: ", result)
     if result:
-        return result.get(metric)
+        value = result.get(metric)
+        return {
+            "type": "metric",
+            "metric": metric,
+            "value": value
+        }
     
     return None

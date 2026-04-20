@@ -47,11 +47,18 @@ def validate_intent(intent):
 
     is_telemetry = intent.metric is not None
     is_vehicle = intent.service == "vehicle_service"
+    have_timerange = intent.time_range is not None
 
     if intent.action == "fetch" and not (is_telemetry or is_vehicle):
         return {
             "type": "error",
             "message": "I am VMS Chatbot. I can't answer to these questions."
+        }
+    
+    elif not have_timerange:
+        return {
+            "type": "error",
+            "message": "Time range is missing in the query. Check if you have passed time range."
         }
 
     return {

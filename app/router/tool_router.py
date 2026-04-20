@@ -46,7 +46,10 @@ def route_tool(intent, plan, company_id):
         validation = validate_api_response(result)
 
         if validation["type"] == "error":
-            return validation["message"]
+            return {
+                "type": "error",
+                "message": validation["message"]
+            }
 
         validated_result = validation["data"]
 

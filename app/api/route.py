@@ -30,7 +30,7 @@ def query_system(data: QueryRequest):
     logger.info(f"Intent vehicle id: {intent.vehicle_id}")
 
     if not intent.vehicle_id:
-        return "Please provide a vehicle ID to proceed."
+        return {"response": "Please provide a vehicle ID to proceed."}  
 
     intent_validation = validate_intent(intent)
     if intent_validation["type"] == "error":

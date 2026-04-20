@@ -33,13 +33,13 @@ def compute_metric(rows, metric, aggregation=None):
         return None
 
     if aggregation == "maximum":
-        return max(values)
+        return round(max(values), 2)
 
     elif aggregation == "minimum":
-        return min(values)
+        return round(min(values),2)
 
     elif aggregation == "average":
-        return sum(values) / len(values)
+        return round(sum(values) / len(values),2)
 
     else:
         return values[-1]  
