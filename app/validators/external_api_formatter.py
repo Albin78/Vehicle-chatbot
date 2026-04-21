@@ -62,7 +62,8 @@ def compute_derived(rows):
     averages = [r.get("maxSpeed", 0) for r in rows]
     return {
         "max_speed": max(speeds, default=0),
-        "average_speed": float(np.mean(averages))
+        "average_speed": float(np.mean(averages)),
+        "minimum_speed": min(speeds, default=0)
     }
 
 
@@ -83,7 +84,7 @@ def build_response(intent, api_result):
         return {
             "type": "metric",
             "metric": plan["metric"],
-            "aggregation": plan["aggregation"] or "current",
+            "aggregation": plan["aggregation"],
             "value": value
         }
 

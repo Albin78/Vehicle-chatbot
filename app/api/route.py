@@ -17,6 +17,8 @@ def query_system(data: QueryRequest):
 
     if not data.query:
         return {"response": "Please provide query."}
+    
+    logger.info(f"Passed query: {data.query}")
 
     company_id = data.company_id
 
@@ -69,7 +71,7 @@ def query_system(data: QueryRequest):
 
     validated_result = validation["data"]
 
-    response = generate_response(data.query, validated_result, intent)
+    response = generate_response(validated_result, intent)
 
     logger.info(f"Response: {response}")
 

@@ -72,13 +72,7 @@ class QueryIntent(BaseModel):
     @classmethod
     def normalize_vehicle_id(cls, v):
         if isinstance(v, str):
-            normalized = re.sub(r"\s+", "", v).upper()
-
-            if not re.match(r"^\d{2,5}[A-Z]{1,4}$", normalized):
-                return None
-
-            return normalized
-
+            return re.sub(r"\s+", "", v).upper()
         return v
 
 

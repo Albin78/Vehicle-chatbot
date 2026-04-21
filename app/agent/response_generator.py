@@ -18,32 +18,40 @@ def get_unit(metric):
 
 def build_user_message(result, intent):
     if not result:
-        return "No data found for the given vehicle."
+        return "I couldn't find any data for the given vehicle."
+
+    time_context = ""
+    if intent.time_range:
+        time_context = f" for the time range {intent.time_range}"
 
     if result["type"] == "metric":
         value = result.get("value")
 
         if value is None:
-            return "No data found for the requested metric."
-
-        unit = get_unit(intent.metric)
+            return "I couldn't find data for the requested metric."
 
         if intent.aggregation:
-            return f"The {intent.aggregation} {intent.metric} for the give date range is {value} {unit}."
+            return (
+                f"For vehicle {intent.vehicle_id}, the {intent.metric} "
+                f"{intent.aggregation}{time_context} is {value}."
+            )
         else:
-            return f"The current {intent.metric} is {value} {unit}."
+            return (
+                f"For vehicle {intent.vehicle_id}, the current "
+                f"{intent.metric}{time_context} is {value}."
+            )
 
     elif result["type"] == "summary":
         return (
-            f"The vehicle with ID {intent.vehicle_id} is a {result.get('vehicle_type')} "
-            f"that traveled {result.get('total_distance')} km, "
-            f"with an average speed of {round(result.get('average_speed'),2)} km/h, "
+            f"Here’s a quick summary for vehicle {intent.vehicle_id}{time_context}: "
+            f"it traveled {result.get('total_distance')} km, "
+            f"with an average speed of {result.get('average_speed')} km/h, "
             f"{result.get('total_moving_time')} moving time and "
             f"{result.get('total_idle_time')} idle time."
         )
 
 
-def generate_response(query, result, intent):
+def generate_response(result, intent):
     
     final_message = build_user_message(result, intent)
     prompt_response = f"""
