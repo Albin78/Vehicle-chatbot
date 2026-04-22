@@ -11,7 +11,7 @@ vehicle_cache = {
 }
 
 
-CACHE_TTL = 600  # 5 minutes
+CACHE_TTL = 1200  # 5 minutes
 
 def normalize_vehicle_id(v_id: str) -> str:
     if not v_id:

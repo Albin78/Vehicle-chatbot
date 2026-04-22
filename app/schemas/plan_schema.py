@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-
+from typing_extensions import Optional
 
 class ExecutionPlan(BaseModel):
 
@@ -13,4 +13,4 @@ class ExecutionPlan(BaseModel):
 
     vehicle_id: str | None
 
-    time_range: str | None
+    time_range: Optional[tuple[str, str]]

@@ -26,22 +26,22 @@ def _normalize_keywords(v: str) -> str:
     return v
 
 
-def _extract_date_range(v: str) -> str | None:
-    """
-    Extract structured date range into canonical format.
-    """
+# def _extract_date_range(v: str) -> str | None:
+#     """
+#     Extract structured date range into canonical format.
+#     """
 
-    # Pattern 1: april 1 to 10
-    m = re.search(r"([a-z]+\s+\d{1,2})\s+to\s+(\d{1,2})", v)
-    if m:
-        return f"{m.group(1)} to {m.group(2)}"
+#     # Pattern 1: april 1 to 10
+#     m = re.search(r"([a-z]+\s+\d{1,2})\s+to\s+(\d{1,2})", v)
+#     if m:
+#         return f"{m.group(1)} to {m.group(2)}"
 
-    # Pattern 2: 1 april to 10 april
-    m = re.search(r"(\d{1,2}\s+[a-z]+)\s+to\s+(\d{1,2}\s+[a-z]+)", v)
-    if m:
-        return f"{m.group(1)} to {m.group(2)}"
+#     # Pattern 2: 1 april to 10 april
+#     m = re.search(r"(\d{1,2}\s+[a-z]+)\s+to\s+(\d{1,2}\s+[a-z]+)", v)
+#     if m:
+#         return f"{m.group(1)} to {m.group(2)}"
 
-    return None
+#     return None
 
 
 class QueryIntent(BaseModel):
@@ -50,7 +50,7 @@ class QueryIntent(BaseModel):
     metric: Optional[str] = None
     aggregation: Optional[str] = None
     analysis: Optional[str] = None
-    time_range: Optional[str] = None
+    time_range: Optional[tuple[str, str]] = None
     service: Optional[str] = None
 
 
@@ -101,10 +101,12 @@ class QueryIntent(BaseModel):
         # Step 1: normalize noisy language
         v = _normalize_keywords(v)
 
-        # Step 2: extract structured range
-        parsed = _extract_date_range(v)
+        return v
 
-        return parsed
+        # # Step 2: extract structured range
+        # parsed = _extract_date_range(v)
+
+        # return parsed
 
 
     # -----------------------------

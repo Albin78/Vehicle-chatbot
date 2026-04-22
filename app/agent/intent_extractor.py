@@ -1,10 +1,11 @@
-import json
 import re
 
 from app.db.mongoclient import get_collection
 from app.llm.ollama_client import OllamaClient
 from app.schemas.intent_schema import QueryIntent
 from app.utils.logger import logger
+from app.validators.intent_validators import sanitize_llm_output, post_validate
+from app.parsers.date_parser import extract_time_range
 
 llm = OllamaClient()
 
@@ -36,185 +37,12 @@ def get_db_fields():
         logger.warning("No documents found in collection")
         return []
 
-    excluded = {"_id", "imei", "date", "sensor"}
+    excluded = {"_id", "imei", "date", "sensor", "moving_time", "last_updated"}
     fields = [k for k in sample.keys() if k not in excluded]
+    logger.info(f"Fields available: {fields}")
 
     return fields
 
-
-# --------------------------------------------------
-# RULE-BASED VEHICLE ID EXTRACTION (STRONG FALLBACK)
-# --------------------------------------------------
-def extract_vehicle_id_rule_based(query: str) -> str | None:
-    query_upper = query.upper()
-
-    patterns = [
-        r"\b\d{2,5}(?:\s+[A-Z]{1,3}){1,3}\b",  
-        r"\b\d{2,5}\s+[A-Z]{2,4}\b",            
-        r"\b\d{2,5}\s+\d{2,4}\b",               
-        r"\b\d{2,5}[A-Z]{2,4}\b",              
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, query_upper)
-        if match:
-            raw = match.group()
-            normalized = re.sub(r"\s+", "", raw)
-
-            # ✅ Updated validation
-            if re.match(r"^\d{2,5}(?:[A-Z]{1,4}|\d{2,4})$", normalized):
-                return normalized
-
-    return None
-
-
-def extract_aggregation_rule_based(query: str) -> str | None:
-    query = query.lower()
-
-    if any(word in query for word in ["minimum", "lowest", "least", "min"]):
-        return "minimum"
-
-    if any(word in query for word in ["maximum", "highest", "top", "peak", "max"]):
-        return "maximum"
-
-    if any(word in query for word in ["average", "mean", "avg"]):
-        return "average"
-
-    return None
-
-
-def is_time_range_in_query(query: str) -> bool:
-    query = query.lower()
-
-    patterns = [
-        r"\bbetween\b",
-        r"\bfrom\b",
-        r"\bto\b",
-        r"\b\d{1,2}\b",            
-        r"\bjan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec\b"
-    ]
-
-    return any(re.search(p, query) for p in patterns)
-
-
-# --------------------------------------------------
-# SANITIZE LLM OUTPUT
-# --------------------------------------------------
-def sanitize_llm_output(raw: str) -> dict:
-
-    if not raw:
-        return DEFAULT_INTENT
-
-    try:
-        match = re.search(r"\{[\s\S]*\}", raw)
-
-        if not match:
-            logger.error(f"No JSON found in response: {raw}")
-            return DEFAULT_INTENT
-
-        json_str = match.group()
-        data = json.loads(json_str)
-
-        if not isinstance(data, dict):
-            logger.error(f"LLM returned non-dict JSON: {data}")
-            return DEFAULT_INTENT
-
-    except Exception as e:
-        logger.error(f"JSON parsing failed: {e}")
-        return DEFAULT_INTENT
-
-    clean_data = {}
-
-    for key in DEFAULT_INTENT.keys():
-        value = data.get(key, None)
-
-        # Reject invalid types
-        if isinstance(value, (dict, list)):
-            logger.warning(f"Invalid nested value for {key}: {value}")
-            value = None
-
-        # Normalize null-like strings
-        if isinstance(value, str) and value.strip().lower() in {"null", "none", ""}:
-            value = None
-
-        clean_data[key] = value
-
-    return clean_data
-
-
-# --------------------------------------------------
-# POST VALIDATION (CRITICAL LAYER)
-# --------------------------------------------------
-def post_validate(clean_data: dict, query: str, fields: list) -> dict:
-
-    # -----------------------------
-    # VEHICLE ID VALIDATION
-    # -----------------------------
-    vid = clean_data.get("vehicle_id")
-
-    if isinstance(vid, str):
-        normalized = re.sub(r"\s+", "", vid.upper())
-        pattern = r"^\d{2,5}(?:[A-Z]{1,4}|\d{2,4})$"
-
-        if re.match(pattern, normalized):
-            clean_data["vehicle_id"] = normalized
-        else:
-            logger.warning(f"Rejected invalid vehicle_id: {vid}")
-            clean_data["vehicle_id"] = None
-
-    # FALLBACK (deterministic)
-    if not clean_data.get("vehicle_id"):
-        fallback_vid = extract_vehicle_id_rule_based(query)
-
-        if fallback_vid:
-            logger.info(f"Recovered vehicle_id from query: {fallback_vid}")
-            clean_data["vehicle_id"] = fallback_vid
-
-    # -----------------------------
-    # METRIC VALIDATION
-    # -----------------------------
-    metric = clean_data.get("metric")
-
-    if isinstance(metric, str):
-        metric = metric.strip().lower()
-
-        if metric not in fields:
-            logger.warning(f"Rejected invalid metric: {metric}")
-            clean_data["metric"] = None
-        else:
-            clean_data["metric"] = metric
-
-    # -----------------------------
-    # AGGREGATION VALIDATION
-    # -----------------------------
-    if clean_data.get("aggregation") and not clean_data.get("metric"):
-        clean_data["aggregation"] = None
-    
-    rule_based_agg = extract_aggregation_rule_based(query)
-
-    if rule_based_agg:
-        if clean_data.get("aggregation") != rule_based_agg:
-            logger.warning(
-                f"Corrected aggregation from {clean_data.get('aggregation')} → {rule_based_agg}"
-            )
-        clean_data["aggregation"] = rule_based_agg
-
-    # -----------------------------
-    # TIME RANGE NORMALIZATION
-    # -----------------------------
-    tr = clean_data.get("time_range")
-
-    if isinstance(tr, str):
-        tr = tr.lower().strip()
-
-        # Normalize patterns
-        tr = re.sub(r"between (.+?) and (.+)", r"\1 to \2", tr)
-        tr = re.sub(r"from (.+?) to (.+)", r"\1 to \2", tr)
-        tr = re.sub(r"(\w+ \d+)-(\d+)", r"\1 to \2", tr)
-
-        clean_data["time_range"] = tr
-
-    return clean_data
 
 
 # INTENT EXTRACTION
@@ -332,20 +160,30 @@ RULES:
 - DO NOT guess
 - DO NOT extract random phrases
 
-----------------------------------------
-METRIC:
+METRIC (VERY STRICT)
 
-VALID BASE METRICS:
-{fields}
+A metric MUST be extracted ONLY if the EXACT word appears in the query.
 
-RULES:
+STRICT RULES:
+- DO NOT infer from words like "details", "report", "summary"
+- DO NOT assume default metrics
+- DO NOT pick the most common metric
+- DO NOT use domain knowledge
 
-1. Metric MUST match EXACT word from list
-2. IGNORE context words:
-   - report, details, summary, data
-3. Examples:
-   "speed report" → "speed"
-   "vehicle details" → null
+CRITICAL:
+If the metric word is NOT explicitly present → return null
+
+EXAMPLES:
+
+"speed of vehicle" → "speed"
+"average speed" → "speed"
+
+"vehicle details" → null
+"vehicle report" → null
+"vehicle data" → null
+
+The list of valid metrics is ONLY for validation, NOT for selection.
+DO NOT pick a metric just because it exists in the list.
 
 ----------------------------------------
 AGGREGATION (STRICT — NO EXCEPTIONS)
@@ -390,7 +228,7 @@ OUTPUT:
 Return ONLY JSON.
 """
 
-    raw_response = llm.generate(prompt)
+    raw_response = llm.generate(prompt,)
 
     logger.info(f"Raw LLM Response: {raw_response}")
 
@@ -402,21 +240,12 @@ Return ONLY JSON.
 
     logger.info(f"After post validation JSON: {clean_data}")
     
-    tr = clean_data.get("time_range")
+    time_range = extract_time_range(query)
 
-    if isinstance(tr, str):
-        if not is_time_range_in_query(query):
-            logger.warning(f"Removed hallucinated time_range: {tr}")
-            clean_data["time_range"] = None
-        else:
-            tr = tr.lower().strip()
-
-            tr = re.sub(r"between (.+?) and (.+)", r"\1 to \2", tr)
-            tr = re.sub(r"from (.+?) to (.+)", r"\1 to \2", tr)
-            tr = re.sub(r"(\w+ \d+)-(\d+)", r"\1 to \2", tr)
-
-            clean_data["time_range"] = tr
-
+    if time_range:
+        clean_data["time_range"] = time_range
+    else:
+        clean_data["time_range"] = None
     # -----------------------------
     # FINAL INTENT OBJECT
     # -----------------------------

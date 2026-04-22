@@ -54,7 +54,7 @@ def validate_intent(intent):
             "type": "error",
             "message": "I am VMS Chatbot. I can't answer to these questions."
         }
-    
+    # elif intent.action == "fetch" and 
     elif not have_timerange:
         return {
             "type": "error",

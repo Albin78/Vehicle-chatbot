@@ -46,6 +46,7 @@ def build_user_message(result, intent):
             f"Here’s a quick summary for vehicle {intent.vehicle_id}{time_context}: "
             f"it traveled {result.get('total_distance')} km, "
             f"with an average speed of {result.get('average_speed')} km/h, "
+            f"total engine hours of {result.get('engine_hours')}"
             f"{result.get('total_moving_time')} moving time and "
             f"{result.get('total_idle_time')} idle time."
         )
