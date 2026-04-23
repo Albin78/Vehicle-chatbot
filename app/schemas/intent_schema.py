@@ -52,6 +52,7 @@ class QueryIntent(BaseModel):
     analysis: Optional[str] = None
     time_range: Optional[tuple[str, str]] = None
     service: Optional[str] = None
+    intent_type: Optional[str]
 
 
     # -----------------------------
@@ -125,11 +126,5 @@ class QueryIntent(BaseModel):
         # Action default
         if self.action not in {"fetch", "update", "delete"}:
             self.action = "fetch"
-
-        # Service logic (SAFE)
-        if vehicle_exists and self.action == "fetch":
-            self.service = "vehicle_service"
-        else:
-            self.service = None
 
         return self

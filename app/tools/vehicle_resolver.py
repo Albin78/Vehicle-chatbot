@@ -1,4 +1,4 @@
-from app.tools.vehicle_cache import get_vehicle_from_cache
+from app.tools.vehicle_cache import get_vehicle_cache, get_realtime_cache
 from app.utils.logger import logger
 from typing import Optional
 
@@ -11,7 +11,7 @@ def resolve_vehicle(vehicle_id: str, company_id: int):
     if not vehicle_id:
         return None
 
-    vehicle = get_vehicle_from_cache(vehicle_id, company_id)
+    vehicle = get_vehicle_cache(company_id)
 
     if not vehicle:
         logger.warning(f"Vehicle not found for ID: {vehicle_id}")

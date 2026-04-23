@@ -4,7 +4,7 @@ from app.db.mongoclient import get_collection
 from app.llm.ollama_client import OllamaClient
 from app.schemas.intent_schema import QueryIntent
 from app.utils.logger import logger
-from app.validators.intent_validators import sanitize_llm_output, post_validate
+from app.validators.intent_validators import sanitize_llm_output, post_validate, map_service
 from app.parsers.date_parser import extract_time_range
 
 llm = OllamaClient()
@@ -20,8 +20,10 @@ DEFAULT_INTENT = {
     "aggregation": None,
     "analysis": None,
     "time_range": None,
+    "intent_type": None,  
     "service": None
 }
+
 
 
 # --------------------------------------------------
@@ -51,61 +53,47 @@ def extract_intent(query: str) -> QueryIntent:
     fields = get_db_fields()
 
     prompt = f"""
-You are a STRICT JSON extractor for a Vehicle Monitoring System.
+You are an expert intent classifier for a Vehicle Monitoring System.
 
-You MUST return ONLY ONE valid JSON object.
-
-----------------------------------------
-STEP 1: RELEVANCE CHECK (MANDATORY)
-
-First determine if the query is related to vehicle monitoring.
-
-A query is VALID ONLY IF it asks about:
-- vehicle data (speed, distance, idle time, moving time, etc.)
-- vehicle activity or performance
-- vehicle analytics over time
-
-A query is INVALID if:
-- it asks about people, general knowledge, or unrelated topics
-- it contains a vehicle_id but the intent is NOT about vehicle data
+Return ONLY ONE valid JSON.
 
 ----------------------------------------
-EXAMPLES:
+STEP 1: RELEVANCE CHECK
 
-VALID:
-"maximum speed of vehicle 4673 J R B"
-"distance traveled by 6534 AKA from april 1 to 10"
-
-INVALID:
-"who is cristiano ronaldo with vehicle 4673 J R B"
-"iphone price for vehicle 6534 AKA"
-"tell me about elon musk 4673 J R B"
+If NOT vehicle-related → return all null
 
 ----------------------------------------
-CRITICAL RULE:
+STEP 2: INTENT CLASSIFICATION (CRITICAL)
 
-IF query is INVALID:
-RETURN EXACTLY THIS JSON:
+Classify query into ONE of:
 
-{{
-  "action": null,
-  "vehicle_id": null,
-  "metric": null,
-  "aggregation": null,
-  "analysis": null,
-  "time_range": null,
-  "service": null
-}}
+1. "realtime"  
+   → current / latest / now / status  
+   → NO time_range required  
 
-DO NOT extract anything.
-DO NOT partially fill fields.
-DO NOT explain.
+2. "historical"  
+   → contains time range  
+   → analytics / summary  
 
-----------------------------------------
-ONLY IF query is VALID → continue below
+3. "alert"  
+   → contains words like:
+     "overspeed", "alerts", "violations"
+
+4. "telemetry"  
+   → raw metric without time range  
+   → from DB
 
 ----------------------------------------
-SCHEMA (STRICT):
+STEP 3: FIELD EXTRACTION
+
+Extract:
+- vehicle_id
+- metric (ONLY if exact word exists)
+- aggregation (ONLY if explicitly present)
+- time_range (ONLY if explicitly present)
+
+----------------------------------------
+STRICT OUTPUT FORMAT:
 
 {{
   "action": "fetch | update | delete",
@@ -114,110 +102,17 @@ SCHEMA (STRICT):
   "aggregation": "minimum" | "maximum" | "average" | null,
   "analysis": string | null,
   "time_range": string | null,
+  "intent_type": "realtime | historical | alert | telemetry | null",
   "service": null
 }}
 
 ----------------------------------------
-CRITICAL OUTPUT RULES:
-
-- Output MUST be valid JSON
-- NO explanation
-- NO extra text
-- NO markdown
-- NO multiple JSON blocks
-- NO additional keys
-- NO nested objects
-- NO arrays
-
-----------------------------------------
-ACTION:
-
-- "delete" → delete
-- "update" → update
-- else → fetch
-
-----------------------------------------
-VEHICLE ID (STRICT HARD RULE)
-
-A vehicle ID MUST follow:
-
-- Starts with 2–5 digits
-- Followed by 1–4 uppercase letters OR digits
-- May contain spaces
-
-VALID:
-"4673 J R B"
-"6534 AKA"
-"53380 533"
-"6667 DKB"
-
-INVALID:
-"iphone price"
-"vehicle details"
-
 RULES:
-- If pattern NOT found → return null
+
 - DO NOT guess
-- DO NOT extract random phrases
-
-METRIC (VERY STRICT)
-
-A metric MUST be extracted ONLY if the EXACT word appears in the query.
-
-STRICT RULES:
-- DO NOT infer from words like "details", "report", "summary"
-- DO NOT assume default metrics
-- DO NOT pick the most common metric
-- DO NOT use domain knowledge
-
-CRITICAL:
-If the metric word is NOT explicitly present → return null
-
-EXAMPLES:
-
-"speed of vehicle" → "speed"
-"average speed" → "speed"
-
-"vehicle details" → null
-"vehicle report" → null
-"vehicle data" → null
-
-The list of valid metrics is ONLY for validation, NOT for selection.
-DO NOT pick a metric just because it exists in the list.
-
-----------------------------------------
-AGGREGATION (STRICT — NO EXCEPTIONS)
-
-Map ONLY from user words:
-
-- "minimum", "lowest", "least" → "minimum"
-- "maximum", "highest", "top", "peak" → "maximum"
-- "average", "mean", "avg" → "average"
-
-RULES:
-
-- NEVER infer aggregation
-- NEVER override user wording
-- If not present → null
-
-----------------------------------------
-TIME RANGE (STRICT)
-
-Extract ONLY if explicitly present.
-
-VALID:
-- "april 1-10" → "april 1 to 10"
-- "between april 1 and 10" → "april 1 to 10"
-
-RULES:
-- If not present → null
-- DO NOT guess
-- DO NOT reuse examples
-
-----------------------------------------
-SERVICE:
-
-Always null
+- DO NOT infer metric
+- DO NOT add fields
+- DO NOT explain
 
 ----------------------------------------
 INPUT:
@@ -225,7 +120,7 @@ INPUT:
 
 ----------------------------------------
 OUTPUT:
-Return ONLY JSON.
+JSON only
 """
 
     raw_response = llm.generate(prompt,)
@@ -237,6 +132,7 @@ Return ONLY JSON.
     # -----------------------------
     clean_data = sanitize_llm_output(raw_response)
     clean_data = post_validate(clean_data, query, fields)
+    clean_data = map_service(clean_data)
 
     logger.info(f"After post validation JSON: {clean_data}")
     

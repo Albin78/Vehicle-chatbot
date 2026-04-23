@@ -1,6 +1,6 @@
 import re
 import calendar
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 
@@ -80,40 +80,100 @@ def build_date_range(year, month, d1, d2):
     )
 
 
+def extract_relative_time(query: str):
+    query = query.lower()
+    today = datetime.now().date()
+
+    if "today" in query:
+        return (str(today), str(today))
+
+    if "yesterday" in query:
+        y = today - timedelta(days=1)
+        return (str(y), str(y))
+
+    match = re.search(r"last\s+(\d+)\s+days", query)
+    if match:
+        days = int(match.group(1))
+        start = today - timedelta(days=days)
+        return (str(start), str(today))
+
+    return None
+
+
+def extract_single_date(query: str):
+    query = query.lower()
+    current_year = datetime.now().year
+
+    pattern = re.search(
+        r"(?:on\s+)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})(?:\s+(\d{4}))?",
+        query
+    )
+
+    if not pattern:
+        return None
+
+    month, day, year = pattern.groups()
+
+    year = int(year) if year else current_year
+    month_num = MONTH_MAP[month[:3]]
+    day = validate_day(year, month_num, int(day))
+
+    date_str = datetime(year, month_num, day).strftime("%Y-%m-%d")
+
+    return (date_str, date_str)
+
+
+
 def extract_time_range(query: str):
 
     if isinstance(query, tuple):
         return query 
     
-    if isinstance(query, str):
-        query = normalize_time_expression(query)
+    if not isinstance(query, str):
+        return None
 
-        current_year = datetime.now().year
+    # -----------------------------
+    # STEP 1: RELATIVE TIME
+    # -----------------------------
+    relative = extract_relative_time(query)
+    if relative:
+        return relative
 
-        pattern = re.search(
-            r"(?:(\d{4})\s+)?"                       # optional year prefix
-            r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+"
-            r"(\d{1,2})\s+to\s+(\d{1,2})"
-            r"(?:\s+(\d{4}))?",                     # optional year suffix
-            query
-        )
+    # -----------------------------
+    # STEP 2: SINGLE DATE
+    # -----------------------------
+    single = extract_single_date(query)
+    if single:
+        return single
 
-        if not pattern:
-            return None
+    # -----------------------------
+    # STEP 3: RANGE (EXISTING)
+    # -----------------------------
+    query = normalize_time_expression(query)
 
-        year_prefix, month, d1, d2, year_suffix = pattern.groups()
+    current_year = datetime.now().year
 
-        # Resolve year
-        if year_prefix:
-            year = year_prefix
-        elif year_suffix:
-            year = year_suffix
-        else:
-            year = str(current_year)
+    pattern = re.search(
+        r"(?:(\d{4})\s+)?"
+        r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+"
+        r"(\d{1,2})\s+to\s+(\d{1,2})"
+        r"(?:\s+(\d{4}))?",
+        query
+    )
 
-        return build_date_range(year, month, d1, d2)
-    
-    return None
+    if not pattern:
+        return None
+
+    year_prefix, month, d1, d2, year_suffix = pattern.groups()
+
+    if year_prefix:
+        year = year_prefix
+    elif year_suffix:
+        year = year_suffix
+    else:
+        year = str(current_year)
+
+    return build_date_range(year, month, d1, d2)
 
 
 

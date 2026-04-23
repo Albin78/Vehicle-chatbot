@@ -1,63 +1,117 @@
 from app.tools.db_tool import fetch_telemetry
 from app.tools.analytics_tool import run_analytics
 from app.tools.vehicle_resolver import resolve_vehicle
-from app.tools.external_api_tool import get_operation_summary
+from app.tools.external_api_tool import (
+    get_operation_summary,
+    get_latestrecord,
+    get_alertreport
+)
 from app.parsers.date_parser import extract_time_range
 from app.validators.external_api_formatter import build_response
-from app.utils.logger import logger
 from app.validators.result_validator import validate_api_response
+from app.utils.logger import logger
 
 
 def route_tool(intent, plan, company_id):
 
+    logger.info(f"[ROUTER] Incoming intent: {intent}")
+    logger.info(f"[ROUTER] Execution plan: {plan}")
+
+    # DB TOOL
+    # --------------------------------------------------
     if plan.tool == "db":
+        logger.info("[ROUTER] Routing to DB tool")
         return fetch_telemetry(plan.imei, plan.metric)
 
+   
+    # ANALYTICS TOOL
+    # --------------------------------------------------
     if plan.tool == "analytics":
+        logger.info("[ROUTER] Routing to Analytics tool")
         return run_analytics(
             plan.imei,
             plan.metric,
             plan.operation
         )
 
+
+    # EXTERNAL API ROUTING
+    # --------------------------------------------------
     if plan.tool == "external_api":
 
-        vehicle_detail = resolve_vehicle(plan.vehicle_id, company_id)
-        logger.info(f"Vehicle details fetched: {vehicle_detail}")
-        logger.info(f"Date from intent: {plan.time_range}")
         
-        parsed = extract_time_range(plan.time_range)
-
-        if not parsed:
-            return "Time range is missing or invalid"
-
-        from_date, to_date = parsed
+        # VEHICLE RESOLUTION
+        # -----------------------------
+        vehicle_detail = resolve_vehicle(plan.vehicle_id, company_id)
+        logger.info(f"[ROUTER] Vehicle resolved: {vehicle_detail}")
 
         if not vehicle_detail:
-            return {"response": "Vehicle not found. Check if you passed the vehicle id or not."}
+            logger.error("[ROUTER] Vehicle not found")
+            return {"type": "error", "message": "Vehicle not found"}
 
-        # Safe after this point
-        id = vehicle_detail["ID"]
-        logger.info(f"ID retrieved: {id}")
-        logger.info(f"Date retrived and formatted as (start, end): {from_date, to_date}")
-        
-        result = get_operation_summary(
-            id=id, 
-            company_id=company_id,
-            from_date=from_date, # type: ignore
-            to_date=to_date      # type: ignore
-        )
+        vehicle_id = vehicle_detail["ID"]
+
+      
+        if intent.service == "alert_service":
+            logger.info("[ROUTER] Routing to Alert API")
+
+            parsed = extract_time_range(plan.time_range)
+            if not parsed:
+                return {"type": "error", "message": "Time range required for alerts"}
+
+            from_date, to_date = parsed
+
+            result = get_alertreport(
+                id=vehicle_id,
+                company_id=company_id,
+                from_date=from_date,  # type: ignore
+                to_date=to_date       # type: ignore
+            )
+
+    
+        elif intent.service == "realtime_service":
+            logger.info("[ROUTER] Routing to Latest Record API")
+
+            result = get_latestrecord(company_id=company_id)
+
+       
+        elif intent.service == "summary_service":
+            logger.info("[ROUTER] Routing to Operation Summary API")
+
+            parsed = extract_time_range(plan.time_range)
+            if not parsed:
+                return {"type": "error", "message": "Time range required"}
+
+            from_date, to_date = parsed
+
+            result = get_operation_summary(
+                id=vehicle_id,
+                company_id=company_id,
+                from_date=from_date, # type: ignore
+                to_date=to_date     # type: ignore
+            )
+
+        else:
+            logger.error(f"[ROUTER] Unknown service: {intent.service}")
+            return {"type": "error", "message": "Invalid service type"}
+
+        logger.info("[ROUTER] Validating API response")
 
         validation = validate_api_response(result)
 
         if validation["type"] == "error":
+            logger.error(f"[ROUTER] Validation failed: {validation['message']}")
             return {
                 "type": "error",
                 "message": validation["message"]
             }
 
-        validated_result = validation["data"]
+        validated_data = validation["data"]
 
-        logger.info(f"Vehicle detail using vehicle_id {plan.vehicle_id}: {validated_result}")
+        logger.info(f"[ROUTER] Validated data: {validated_data}")
 
-        return build_response(intent, validated_result)
+        final_response = build_response(intent, validated_data)
+
+        logger.info(f"[ROUTER] Final response: {final_response}")
+
+        return final_response

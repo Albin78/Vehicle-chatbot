@@ -13,6 +13,7 @@ DEFAULT_INTENT = {
     "aggregation": None,
     "analysis": None,
     "time_range": None,
+    "intent_type": None,  
     "service": None
 }
 
@@ -116,6 +117,68 @@ def is_metric_in_query(query: str, metric: str) -> bool:
     return all(token in query for token in tokens)
 
 
+def map_service(clean_data):
+
+    intent_type = clean_data.get("intent_type")
+
+    if intent_type == "realtime":
+        clean_data["service"] = "realtime_service"
+
+    elif intent_type == "alert":
+        clean_data["service"] = "alert_service"
+
+    elif intent_type == "historical":
+        clean_data["service"] = "summary_service"
+
+    elif intent_type == "telemetry":
+        clean_data["service"] = "db_service"
+
+    else:
+        clean_data["service"] = None
+
+    return clean_data
+
+
+def detect_intent_type(query: str, clean_data: dict) -> str | None:
+    q = query.lower()
+
+    has_metric = clean_data.get("metric") is not None
+    has_agg = clean_data.get("aggregation") is not None
+    has_time = clean_data.get("time_range") is not None
+
+    # -----------------------------
+    # ALERT (highest priority)
+    # -----------------------------
+    if any(word in q for word in ["overspeed", "alert", "violation"]):
+        return "alert"
+
+    # -----------------------------
+    # REALTIME (explicit)
+    # -----------------------------
+    if any(word in q for word in ["current", "now", "latest", "status"]):
+        return "realtime"
+
+    # -----------------------------
+    # AGGREGATION WITHOUT TIME
+    # -----------------------------
+    if has_metric and has_agg:
+        return "historical"
+
+    # -----------------------------
+    # TIME-BASED
+    # -----------------------------
+    if has_time:
+        return "historical"
+
+    # -----------------------------
+    # PURE METRIC (AMBIGUOUS)
+    # -----------------------------
+    if has_metric:
+        return "realtime"   # 🔥 DEFAULT FALLBACK
+
+    return None
+
+
 # POST VALIDATION (CRITICAL LAYER)
 # --------------------------------------------------
 def post_validate(clean_data: dict, query: str, fields: list) -> dict:
@@ -176,8 +239,23 @@ def post_validate(clean_data: dict, query: str, fields: list) -> dict:
                     f"Corrected aggregation from {clean_data.get('aggregation')} → {rule_based_agg}"
                 )
             clean_data["aggregation"] = rule_based_agg
+  
 
+    # INTENT TYPE DETECTION (CRITICAL)
     # -----------------------------
+    rule_intent = detect_intent_type(query, clean_data)
+    llm_intent = clean_data.get("intent_type")
+
+    if rule_intent:
+        if llm_intent != rule_intent:
+            logger.warning(
+                f"Corrected intent_type from {llm_intent} → {rule_intent}"
+            )
+        clean_data["intent_type"] = rule_intent
+    else:
+        clean_data["intent_type"] = llm_intent
+
+
     # TIME RANGE NORMALIZATION
     # -----------------------------
     tr = clean_data.get("time_range")

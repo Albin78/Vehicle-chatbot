@@ -148,3 +148,127 @@ def get_operation_summary(
     except Exception:
         logger.exception("Unexpected Error")
         return {"response": "Some internal error happened"}
+    
+
+
+def get_latestrecord(
+    company_id: int | None
+):
+    try:
+        if not company_id:
+            return {"response": "Company ID is required"}
+
+        headers = {
+            "Authorization": f"Bearer {AUTH_TOKEN}",
+            "Accept": "*/*",
+            "User-Agent": "MyUserAgent"
+        }
+
+        url = "https://api.girfalco.sa/v2/vehicle/vehiclelastrecordsNew"
+
+        params = {
+            "new": 1,
+            "companyId": company_id,
+            "vgid": "",
+            "disconnected": "false",
+            "page": 1,
+            "row": 10
+        }
+
+        logger.info(f"Calling Latestrecords API of url: {url}")
+
+        response = requests.get(
+            url,
+            headers=headers,
+            params=params,
+            timeout=10
+        )
+
+        logger.info(f"Status Code: {response.status_code}")
+
+        if response.status_code != 200:
+            logger.error(f"HTTP Error: {response.status_code}")
+            return {"response": "Unable to fetch latestrecords api"}
+
+        data = response.json()
+
+        if not data.get("data"):
+            return {"response": "No data available for this vehicle"}
+
+        return data
+
+    except requests.exceptions.Timeout:
+        logger.exception("Timeout Error")
+        return {"response": "Request timed out"}
+
+    except requests.exceptions.ConnectionError:
+        logger.exception("Connection Error")
+        return {"response": "Unable to connect to report service"}
+
+    except Exception:
+        logger.exception("Unexpected Error")
+        return {"response": "Some internal error happened"}
+    
+
+def get_alertreport(
+    id: int | None,
+    company_id: int | None,
+    from_date: datetime | None,
+    to_date: datetime | None
+):
+    try:
+        if not id:
+            return {"response": "ID is required"}
+
+        headers = {
+            "Authorization": f"Bearer {AUTH_TOKEN}",
+            "Accept": "*/*",
+            "User-Agent": "MyUserAgent"
+        }
+
+        url = "https://api.girfalco.sa/v2/alert/listAlertReport"
+
+        params = {
+            "vehicleID": id,
+            "fromDate": from_date,
+            "toDate": to_date,
+            "vehicleType": "All",
+            "vehicleGroup": "All",
+            "cid": company_id,
+            "vgid": "",
+            "sort": 1
+        }
+
+        logger.info(f"Calling Alert list Report API for vehicleID: {id}")
+
+        response = requests.get(
+            url,
+            headers=headers,
+            params=params,
+            timeout=10
+        )
+
+        logger.info(f"Status Code: {response.status_code}")
+
+        if response.status_code != 200:
+            logger.error(f"HTTP Error: {response.status_code}")
+            return {"response": "Unable to fetch Alert list records"}
+
+        data = response.json()
+
+        if not data.get("results"):
+            return {"response": "No data available for this vehicle"}
+
+        return data
+
+    except requests.exceptions.Timeout:
+        logger.exception("Timeout Error")
+        return {"response": "Request timed out"}
+
+    except requests.exceptions.ConnectionError:
+        logger.exception("Connection Error")
+        return {"response": "Unable to connect to report service"}
+
+    except Exception:
+        logger.exception("Unexpected Error")
+        return {"response": "Some internal error happened"}
