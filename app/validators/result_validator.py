@@ -45,24 +45,26 @@ def validate_action(intent) -> dict[str, Any]:
 
 def validate_intent(intent):
 
-    is_telemetry = intent.metric is not None
-    is_vehicle = intent.intent_type == "realtime"
+    is_realtime = intent.intent_type == "realtime"
     is_historical = intent.intent_type == "historical"
     is_alert = intent.intent_type == "alert"
+    is_telemetry = intent.metric is not None
 
     have_timerange = intent.time_range is not None
 
     # -----------------------------
     # INVALID DOMAIN
     # -----------------------------
-    if intent.action == "fetch" and not (is_telemetry or is_vehicle or is_alert):
+    if intent.action == "fetch" and not (
+        is_telemetry or is_realtime or is_historical or is_alert
+    ):
         return {
             "type": "error",
             "message": "I am VMS Chatbot. I can't answer to these questions."
         }
 
     # -----------------------------
-    # TIME VALIDATION (CONDITIONAL)
+    # TIME VALIDATION
     # -----------------------------
     if is_historical and not have_timerange:
         return {
@@ -70,8 +72,8 @@ def validate_intent(intent):
             "message": "Time range is required for historical queries."
         }
 
-    # ✅ realtime → no time needed
-    # ✅ alert → optional (fallback later)
+    # realtime → no time needed ✅
+    # alert → optional (handled in router) ✅
 
     return {
         "type": "success",
