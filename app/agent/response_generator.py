@@ -1,6 +1,56 @@
 from app.llm.ollama_client import OllamaClient
+from app.utils.logger import logger
+from datetime import datetime
 
 llm = OllamaClient()
+
+
+from datetime import datetime
+from typing import Union, Tuple
+
+def format_time_range(time_range: Union[str, Tuple[str, str]]) -> str:
+    if not time_range:
+        return ""
+
+    try:
+        # -----------------------------
+        # CASE 1: Single date string
+        # -----------------------------
+        if isinstance(time_range, str):
+            dt = datetime.strptime(time_range, "%Y-%m-%d")
+            return dt.strftime("%B %d").replace(" 0", " ")
+
+        # -----------------------------
+        # CASE 2: Tuple (range)
+        # -----------------------------
+        if isinstance(time_range, tuple):
+            start, end = time_range
+
+            if not start:
+                return ""
+
+            start_date = datetime.strptime(start, "%Y-%m-%d")
+
+            # If end is missing → treat as single
+            if not end:
+                return start_date.strftime("%B %d").replace(" 0", " ")
+
+            end_date = datetime.strptime(end, "%Y-%m-%d")
+
+            # Same date → single output
+            if start_date == end_date:
+                return start_date.strftime("%B %d").replace(" 0", " ")
+
+            # Range output
+            start_fmt = start_date.strftime("%B %d").replace(" 0", " ")
+            end_fmt = end_date.strftime("%B %d").replace(" 0", " ")
+
+            return f"{start_fmt} to {end_fmt}"
+
+    except Exception:
+        return ""
+
+    return ""
 
 
 def get_unit(metric):
@@ -21,7 +71,8 @@ def build_user_message(result, intent):
 
     time_context = ""
     if intent.time_range:
-        time_context = f" for the time range {intent.time_range}"
+        timestamp_to_date = format_time_range(intent.time_range)
+        time_context = f" for the time range {timestamp_to_date}"
 
     result_type = result.get("type")
 
@@ -37,7 +88,37 @@ def build_user_message(result, intent):
         return (
             f"The current {metric} of vehicle {result.get('vehicle')} "
             f"is {value} {unit}."
+        ) 
+    
+    if result_type == "alert_summary":
+
+        latest = result.get("latest_alert", {})
+
+        parts = []
+
+        parts.append(
+            f"The latest {latest.get('alert_name')} alert"
         )
+
+        if latest.get("time"):
+            time = latest.get('Date')
+            time = format_time_range(time)
+            logger.info(f"Changed time format using custom function: {time}")
+            parts.append(f"occurred at {time}")
+
+        if latest.get("driver"):
+            parts.append(f"with driver {latest.get('driver')}")
+
+        if latest.get("current_value"):
+            parts.append(f"value was {latest.get('current_value')}")
+
+        if latest.get("duration"):
+            parts.append(f"lasting {latest.get('duration')}")
+
+        if result.get("total_alerts") is not None:
+            parts.append(f"total alerts are {result.get('total_alerts')}")
+        return ", ".join(parts) + "."
+
 
     if result_type == "realtime_status":
 
@@ -71,7 +152,7 @@ def build_user_message(result, intent):
 
         return ", ".join(parts) + "."
     
-
+    
     # HISTORICAL METRIC
     # -----------------------------
     if result_type == "metric":
@@ -104,7 +185,7 @@ def build_user_message(result, intent):
             f"{result.get('engine_hours')}."
         )
 
-    return "Unable to generate response."
+    return result["message"]
 
 
 

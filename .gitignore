@@ -80,3 +80,4 @@ secrets/
 *.key
 
 to_add.txt
+/main_test.py

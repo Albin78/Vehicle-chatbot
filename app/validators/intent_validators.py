@@ -27,10 +27,10 @@ REALTIME_ALLOWED_METRICS = {
 }
 
 METRIC_SYNONYMS = {
-    "battery": "battery_level",
-    "battery level": "battery_level",
-    "battery status": "battery_level",
-    "battery voltage": "battery_level",
+    "battery": "battery",
+    "battery level": "battery",
+    "battery status": "battery",
+    "battery voltage": "battery",
 
     "fuel": "fuel_capacity",
     "fuel level": "fuel_capacity",
@@ -45,6 +45,17 @@ METRIC_SYNONYMS = {
     "weight": "weight"
 }
 
+VEHICLE_ID_PATTERN = re.compile(
+    r"\b\d{2,5}(?:[\s\-]?[A-Z0-9]{1,3}){1,3}\b"
+)
+
+# VALID_VEHICLE_ID_PATTERN = re.compile(
+#     r"^\d{2,5}(?:[A-Z]{1,3}|\d{1,3})+$"
+# )
+
+VALID_VEHICLE_ID_PATTERN = re.compile(
+    r"^\d{2,5}[A-Z]{1,3}$"
+)
 
 fields = get_db_fields()
 
@@ -71,25 +82,43 @@ def normalize_metric(metric: str | None, query: str) -> str | None:
 # --------------------------------------------------
 # RULE-BASED VEHICLE ID EXTRACTION (STRONG FALLBACK)
 # --------------------------------------------------
+
 def extract_vehicle_id_rule_based(query: str) -> str | None:
-    query_upper = query.upper()
+    match = VEHICLE_ID_PATTERN.search(query.upper())
+    if not match:
+        return None
 
-    patterns = [
-        r"\b\d{2,5}(?:\s+[A-Z]{1,3}){1,3}\b",  
-        r"\b\d{2,5}\s+[A-Z]{2,4}\b",            
-        r"\b\d{2,5}\s+\d{2,4}\b",               
-        r"\b\d{2,5}[A-Z]{2,4}\b",              
-    ]
+    raw = match.group()
+    return re.sub(r"\s+", "", raw)
 
-    for pattern in patterns:
-        match = re.search(pattern, query_upper)
-        if match:
-            raw = match.group()
-            normalized = re.sub(r"\s+", "", raw)
 
-            # ✅ Updated validation
-            if re.match(r"^\d{2,5}(?:[A-Z]{1,4}|\d{2,4})$", normalized):
-                return normalized
+def is_valid_vehicle_id(vid: str) -> bool:
+    return bool(VALID_VEHICLE_ID_PATTERN.match(vid))
+
+
+def resolve_vehicle_id(clean_data, query):
+    fallback_vid = extract_vehicle_id_rule_based(query)
+    llm_vid = clean_data.get("vehicle_id")
+
+    if isinstance(llm_vid, str):
+        llm_vid = re.sub(r"\s+", "", llm_vid.upper())
+
+    final_vid = None
+
+    if fallback_vid:
+        if not llm_vid:
+            final_vid = fallback_vid
+        elif not is_valid_vehicle_id(llm_vid):
+            final_vid = fallback_vid
+        elif len(fallback_vid) > len(llm_vid):
+            final_vid = fallback_vid
+        else:
+            final_vid = llm_vid
+    else:
+        final_vid = llm_vid
+
+    if final_vid and is_valid_vehicle_id(final_vid):
+        return final_vid
 
     return None
 
@@ -283,28 +312,18 @@ def detect_intent_type(query: str, clean_data: dict) -> str | None:
 # --------------------------------------------------
 def post_validate(clean_data: dict, query: str, fields: list) -> dict:
 
-    # -----------------------------
-    # VEHICLE ID VALIDATION
-    # -----------------------------
-    vid = clean_data.get("vehicle_id")
+   # -----------------------------
+# VEHICLE ID RESOLUTION (FINAL FIX)
+# -----------------------------
+    resolved_vid = resolve_vehicle_id(clean_data, query)
 
-    if isinstance(vid, str):
-        normalized = re.sub(r"\s+", "", vid.upper())
-        pattern = r"^\d{2,5}(?:[A-Z]{1,4}|\d{2,4})$"
-
-        if re.match(pattern, normalized):
-            clean_data["vehicle_id"] = normalized
-        else:
-            logger.warning(f"Rejected invalid vehicle_id: {vid}")
-            clean_data["vehicle_id"] = None
-
-    # FALLBACK (deterministic)
-    if not clean_data.get("vehicle_id"):
-        fallback_vid = extract_vehicle_id_rule_based(query)
-
-        if fallback_vid:
-            logger.info(f"Recovered vehicle_id from query: {fallback_vid}")
-            clean_data["vehicle_id"] = fallback_vid
+    if resolved_vid:
+        if clean_data.get("vehicle_id") != resolved_vid:
+            logger.info(f"Corrected vehicle_id from {clean_data.get('vehicle_id')} → {resolved_vid}")
+        clean_data["vehicle_id"] = resolved_vid
+    else:
+        logger.warning(f"Failed to resolve vehicle_id from query: {query}")
+        clean_data["vehicle_id"] = None
     
 
     # -----------------------------

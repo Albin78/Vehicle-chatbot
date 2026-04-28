@@ -18,16 +18,16 @@ def query_system(data: QueryRequest):
     if not data.query:
         return {"response": "Please provide query."}
     
-    logger.info(f"Passed query: {data.query}")
-
     company_id = data.company_id
 
     if not company_id:
         return {"response": "Please provide company id."}
     
+    
+    logger.info(f"Passed query: {data.query}")
 
     intent = extract_intent(data.query)
-
+        
     logger.info(f"Intent: {intent}")
     logger.info(f"Intent vehicle id: {intent.vehicle_id}")
 

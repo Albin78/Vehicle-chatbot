@@ -210,22 +210,27 @@
 
 
 
-import requests
+# import requests
 
 
-API_URL = "http://209.209.41.204:11434/api/generate"
+# API_URL = "http://209.209.41.204:11434/api/generate"
 
-MODEL = "llama3.2:3b"
+# MODEL = "llama3.2:3b"
 
-payload = {"model": MODEL, 
-           "prompt": "Hello, explain what AI is in one sentence.", 
-           "stream": False
-}
+# payload = {"model": MODEL, 
+#            "prompt": "Hello, explain what AI is in one sentence.", 
+#            "stream": False
+# }
 
-response = requests.post(API_URL, json=payload)
+# response = requests.post(API_URL, json=payload)
 
-print("Status Code:", response.status_code)
+# print("Status Code:", response.status_code)
 
-print("Response:\n")
+# print("Response:\n")
 
-print(response.json())
+# print(response.json())
+
+
+a = [10, 29, 39, 56, 78, 98]
+for i in enumerate(a):
+    print(i)

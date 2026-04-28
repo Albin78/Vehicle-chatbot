@@ -201,3 +201,25 @@ def format_time_range(time_range):
             return str(time_range)
 
     return str(time_range)
+
+from datetime import datetime
+
+
+def parse_date(date_str: str) -> datetime | None:
+    if not date_str:
+        return None
+
+    formats = [
+        "%Y-%m-%d",
+        "%Y-%m-%dT%H:%M:%S.%fZ",  # 2026-04-28T10:14:34.000Z
+        "%Y-%m-%dT%H:%M:%SZ",     # 2026-04-28T10:14:34Z
+        "%Y-%m-%d %H:%M:%S"
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+
+    return None

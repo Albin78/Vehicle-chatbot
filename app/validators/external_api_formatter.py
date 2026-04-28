@@ -1,4 +1,5 @@
 import numpy as np
+from datetime import datetime
 from app.tools.vehicle_resolver import normalize_vehicle_id
 
 
@@ -124,6 +125,30 @@ def build_realtime_response(intent, api_result):
     return build_realtime_status_response(vehicle)
 
 
+def parse_date(date_str):
+    return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+
+
+def build_alert_response(api_result):
+    alerts = api_result.get("results", [])
+
+    if not alerts:
+        return error_response("No alerts found")
+
+    latest = max(alerts, key=lambda x: parse_date(x.get("Date")))
+
+    return {
+        "type": "alert_summary",
+        "latest_alert": {
+            "alert_name": latest.get("AlertName"),
+            "time": latest.get("Date"),
+            "driver": latest.get("DriverName"),
+            "current_value": latest.get("CurrentValue"),
+            "duration": latest.get("Duration")
+        },
+        "total_alerts": len(alerts)
+    }
+
 
 def compute_metric(rows, metric, aggregation=None):
     if not rows:
@@ -186,7 +211,10 @@ def build_response(intent, api_result):
     # -----------------------------
     if intent.intent_type == "realtime":
         return build_realtime_response(intent, api_result)
-
+    
+    # Alert
+    if intent.intent_type == "alert":
+        return build_alert_response(api_result)
     # -----------------------------
     # HISTORICAL
     # -----------------------------

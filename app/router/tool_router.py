@@ -67,6 +67,7 @@ def route_tool(intent, plan, company_id):
                 from_date=from_date,  # type: ignore
                 to_date=to_date       # type: ignore
             )
+            logger.info(f"Total alerts from alert api result for the given range: {result.get('total', 0)}")
 
     
         elif intent.service == "realtime_service":

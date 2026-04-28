@@ -229,7 +229,7 @@ def get_alertreport(
         url = "https://api.girfalco.sa/v2/alert/listAlertReport"
 
         params = {
-            "vehicleID": id,
+            "vid": id,
             "fromDate": from_date,
             "toDate": to_date,
             "vehicleType": "All",
@@ -239,7 +239,7 @@ def get_alertreport(
             "sort": 1
         }
 
-        logger.info(f"Calling Alert list Report API for vehicleID: {id}")
+        logger.info(f"Calling Alert list Report API {url}  for vehicleID: {id}")
 
         response = requests.get(
             url,
