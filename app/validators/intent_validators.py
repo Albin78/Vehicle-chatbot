@@ -1,7 +1,7 @@
 import json
 import re
 from app.utils.logger import logger
-
+from app.db.mongoclient import get_db_fields
 
 # --------------------------------------------------
 # DEFAULT SAFE INTENT (FALLBACK)
@@ -17,6 +17,56 @@ DEFAULT_INTENT = {
     "service": None
 }
 
+REALTIME_ALLOWED_METRICS = {
+    "speed",
+    "battery",
+    "fuel_capacity",
+    "tanker_fuel_capacity",
+    "weight",
+    "mileage"
+}
+
+METRIC_SYNONYMS = {
+    "battery": "battery_level",
+    "battery level": "battery_level",
+    "battery status": "battery_level",
+    "battery voltage": "battery_level",
+
+    "fuel": "fuel_capacity",
+    "fuel level": "fuel_capacity",
+
+    "tanker": "tanker_fuel_capacity",
+    "tanker capacity": "tanker_fuel_capacity",
+
+    "distance": "mileage",
+    "mileage": "mileage",
+
+    "speed": "speed",
+    "weight": "weight"
+}
+
+
+fields = get_db_fields()
+
+HISTORICAL_ALLOWED_METRICS = set(fields)  # from DB
+
+
+def normalize_metric(metric: str | None, query: str) -> str | None:
+    q = query.lower()
+
+    # If LLM gave something, normalize it
+    if metric:
+        metric = metric.lower().strip()
+
+        if metric in METRIC_SYNONYMS:
+            return METRIC_SYNONYMS[metric]
+
+    # Try to infer from query phrases
+    for phrase, canonical in METRIC_SYNONYMS.items():
+        if phrase in q:
+            return canonical
+
+    return metric
 
 # --------------------------------------------------
 # RULE-BASED VEHICLE ID EXTRACTION (STRONG FALLBACK)
@@ -108,13 +158,33 @@ def is_metric_in_query(query: str, metric: str) -> bool:
     if not metric:
         return False
 
-    query = query.lower()
-    metric = metric.lower()
+    q = query.lower()
 
-    # Handle snake_case like moving_time → ["moving", "time"]
+    # Check synonym phrases
+    for phrase, canonical in METRIC_SYNONYMS.items():
+        if canonical == metric and phrase in q:
+            return True
+
+    # fallback token match
     tokens = metric.split("_")
+    return all(token in q for token in tokens)
 
-    return all(token in query for token in tokens)
+
+def extract_metric_rule_based(query: str) -> str | None:
+    q = query.lower()
+
+    # First check synonyms (stronger)
+    for phrase, canonical in METRIC_SYNONYMS.items():
+        if phrase in q:
+            return canonical
+
+    # fallback to direct metrics
+    for metric in REALTIME_ALLOWED_METRICS:
+        tokens = metric.split("_")
+        if all(token in q for token in tokens):
+            return metric
+
+    return None
 
 
 def map_service(clean_data):
@@ -139,10 +209,40 @@ def map_service(clean_data):
     return clean_data
 
 
+def validate_metric(metric, query, clean_data, fields):
+
+    if not metric:
+        return None
+
+    metric = metric.strip().lower()
+
+    intent_type = clean_data.get("intent_type")
+
+  
+    if intent_type == "realtime":
+        if metric not in REALTIME_ALLOWED_METRICS:
+            logger.warning(f"Rejected invalid realtime metric: {metric}")
+            return None
+
+    elif intent_type == "historical":
+        if metric not in fields:
+            logger.warning(f"Rejected invalid historical metric: {metric}")
+            return None
+
+    
+    if not is_metric_in_query(query, metric):
+        logger.warning(f"Rejected hallucinated metric: {metric}")
+        return None
+
+    return metric
+
+
 def detect_intent_type(query: str, clean_data: dict) -> str | None:
     q = query.lower()
 
-    has_metric = clean_data.get("metric") is not None
+    has_metric = clean_data.get("metric") is not None or any(
+    word in query.lower() for word in REALTIME_ALLOWED_METRICS
+)
     has_agg = clean_data.get("aggregation") is not None
     has_time = clean_data.get("time_range") is not None
 
@@ -174,7 +274,7 @@ def detect_intent_type(query: str, clean_data: dict) -> str | None:
     # PURE METRIC (AMBIGUOUS)
     # -----------------------------
     if has_metric:
-        return "realtime"   # 🔥 DEFAULT FALLBACK
+        return "realtime"   
 
     return None
 
@@ -205,24 +305,32 @@ def post_validate(clean_data: dict, query: str, fields: list) -> dict:
         if fallback_vid:
             logger.info(f"Recovered vehicle_id from query: {fallback_vid}")
             clean_data["vehicle_id"] = fallback_vid
+    
 
+    # -----------------------------
+    # METRIC FALLBACK (CRITICAL FIX)
+    # -----------------------------
+    if not clean_data.get("metric"):
+        fallback_metric = extract_metric_rule_based(query)
+
+        if fallback_metric:
+            logger.info(f"Recovered metric from query: {fallback_metric}")
+            clean_data["metric"] = fallback_metric
+    
+
+    clean_data["metric"] = normalize_metric(
+    clean_data.get("metric"),
+    query
+)
+    
     # METRIC VALIDATION
     # -----------------------------
-    metric = clean_data.get("metric")
-
-    if isinstance(metric, str):
-        metric = metric.strip().lower()
-
-        if metric not in fields:
-            logger.warning(f"Rejected invalid metric: {metric}")
-            clean_data["metric"] = None
-
-        elif not is_metric_in_query(query, metric):
-            logger.warning(f"Rejected hallucinated metric: {metric}")
-            clean_data["metric"] = None
-
-        else:
-            clean_data["metric"] = metric
+    clean_data["metric"] = validate_metric(
+    clean_data.get("metric"),
+    query,
+    clean_data,
+    fields
+)
 
     # -----------------------------
     # AGGREGATION VALIDATION

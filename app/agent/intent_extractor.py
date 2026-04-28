@@ -1,7 +1,5 @@
-import re
-
-from app.db.mongoclient import get_collection
 from app.llm.ollama_client import OllamaClient
+from app.db.mongoclient import get_db_fields
 from app.schemas.intent_schema import QueryIntent
 from app.utils.logger import logger
 from app.validators.intent_validators import sanitize_llm_output, post_validate, map_service
@@ -23,28 +21,6 @@ DEFAULT_INTENT = {
     "intent_type": None,  
     "service": None
 }
-
-
-
-# --------------------------------------------------
-# FETCH DB FIELDS (FOR METRIC CONTROL)
-# --------------------------------------------------
-def get_db_fields():
-    collection = get_collection()
-    logger.info(f"Mongo collection: {collection}")
-
-    sample = collection.find_one()
-
-    if not sample:
-        logger.warning("No documents found in collection")
-        return []
-
-    excluded = {"_id", "imei", "date", "sensor", "moving_time", "last_updated"}
-    fields = [k for k in sample.keys() if k not in excluded]
-    logger.info(f"Fields available: {fields}")
-
-    return fields
-
 
 
 # INTENT EXTRACTION

@@ -123,34 +123,7 @@ def extract_single_date(query: str):
     return (date_str, date_str)
 
 
-
-def extract_time_range(query: str):
-
-    if isinstance(query, tuple):
-        return query 
-    
-    if not isinstance(query, str):
-        return None
-
-    # -----------------------------
-    # STEP 1: RELATIVE TIME
-    # -----------------------------
-    relative = extract_relative_time(query)
-    if relative:
-        return relative
-
-    # -----------------------------
-    # STEP 2: SINGLE DATE
-    # -----------------------------
-    single = extract_single_date(query)
-    if single:
-        return single
-
-    # -----------------------------
-    # STEP 3: RANGE (EXISTING)
-    # -----------------------------
-    query = normalize_time_expression(query)
-
+def extract_range_date(query: str):
     current_year = datetime.now().year
 
     pattern = re.search(
@@ -175,6 +148,39 @@ def extract_time_range(query: str):
 
     return build_date_range(year, month, d1, d2)
 
+
+def extract_time_range(query: str):
+
+    if isinstance(query, tuple):
+        return query 
+    
+    if not isinstance(query, str):
+        return None
+
+    # -----------------------------
+    # STEP 1: RELATIVE TIME
+    # -----------------------------
+    relative = extract_relative_time(query)
+    if relative:
+        return relative
+
+    # -----------------------------
+    # STEP 2: RANGE (MOVE UP)
+    # -----------------------------
+    query = normalize_time_expression(query)
+
+    range_result = extract_range_date(query)
+    if range_result:
+        return range_result
+
+    # -----------------------------
+    # STEP 3: SINGLE DATE (LAST)
+    # -----------------------------
+    single = extract_single_date(query)
+    if single:
+        return single
+
+    return None
 
 
 def format_time_range(time_range):

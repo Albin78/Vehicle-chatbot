@@ -39,16 +39,39 @@ def build_user_message(result, intent):
             f"is {value} {unit}."
         )
 
-    # -----------------------------
-    # REALTIME STATUS
-    # -----------------------------
     if result_type == "realtime_status":
-        return (
-            f"The vehicle {result.get('vehicle')} is currently "
-            f"{result.get('status')} (last updated {result.get('last_updated')})."
+
+        parts = []
+
+        parts.append(
+            f"The vehicle {result.get('vehicle')} is {result.get('status')}"
         )
 
-    # -----------------------------
+        if result.get("last_updated"):
+            parts.append(f"(last updated {result.get('last_updated')})")
+
+        # dynamic fields
+        if "speed" in result:
+            parts.append(f"speed is {result['speed']} km/h")
+
+        if "battery_level" in result:
+            parts.append(f"battery is {result['battery_level']} V")
+
+        if "fuel_capacity" in result:
+            parts.append(f"fuel capacity is {result['fuel_capacity']} L")
+
+        if "tanker_fuel_capacity" in result:
+            parts.append(f"tanker capacity is {result['tanker_fuel_capacity']} L")
+
+        if "weight" in result:
+            parts.append(f"weight is {result['weight']} kg")
+
+        if "driver" in result:
+            parts.append(f"driver is {result['driver']}")
+
+        return ", ".join(parts) + "."
+    
+
     # HISTORICAL METRIC
     # -----------------------------
     if result_type == "metric":
@@ -90,35 +113,32 @@ def generate_response(result, intent):
     if not result or "error" in result:
         return result.get("error", "No data found.")
 
+    base_message = build_user_message(result, intent)
+
+   
     prompt = f"""
-You are a vehicle telemetry assistant.
+You are a strict response formatter.
 
-Generate a natural, conversational response using ONLY the provided data.
+Rewrite the sentence ONLY for grammar and readability.
 
 ----------------------------------------
-DATA:
-{result}
-
-INTENT:
-- metric: {intent.metric}
-- vehicle: {intent.vehicle_id}
-- intent_type: {intent.intent_type}
+INPUT:
+{base_message}
 ----------------------------------------
 
-STRICT RULES:
+CRITICAL RULES:
 
-- Use ONLY values present in DATA
-- DO NOT modify numbers
-- DO NOT infer or assume anything
-- DO NOT add explanations beyond the data
-- Keep response concise and natural
-- Prefer 1–2 sentences max
-- If metric query → answer ONLY that metric
-- If status query → describe status naturally
+- You MUST NOT remove ANY information
+- You MUST NOT shorten the sentence
+- You MUST include EVERY field mentioned
+- You MUST keep ALL numbers EXACT
+- You MUST keep ALL units EXACT
+- Output must contain SAME number of data points as input
+- Do NOT summarize
 
 ----------------------------------------
 
-Generate the response:
+Return EXACTLY one sentence.
 """
 
     return llm.generate(prompt)

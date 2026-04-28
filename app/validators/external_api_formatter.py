@@ -1,6 +1,16 @@
 import numpy as np
 from app.tools.vehicle_resolver import normalize_vehicle_id
 
+
+REALTIME_METRIC_MAP = {
+    "speed": "speed",
+    "weight": "Weight",
+    "fuel_capacity": "fuelCapacity",
+    "tanker_fuel_capacity": "TankerfuelCapacity",
+    "battery": "batteryLevel"
+}
+
+
 def build_execution_plan(intent):
     return {
         "intent_type": intent.intent_type, 
@@ -11,14 +21,37 @@ def build_execution_plan(intent):
         "aggregation": intent.aggregation
     }
 
+def error_response(message):
+    return {
+        "type": "error",
+        "message": message
+    }
 
-def filter_vehicle_from_realtime(data, vehicle_id=None):
-    
-        
+
+def filter_vehicle_from_realtime(data, vehicle_id):
+    normalized_input = normalize_vehicle_id(vehicle_id)
+
     for record in data:
-        if record.get("numberPlate", "").replace(" ", "") == vehicle_id:
+        plate = normalize_vehicle_id(record.get("numberPlate"))
+        if plate == normalized_input:
             return record
     return None
+
+def build_realtime_metric_response(vehicle, metric):
+
+    if metric not in REALTIME_METRIC_MAP:
+        return error_response(f"Unsupported metric: {metric}")
+
+    field = REALTIME_METRIC_MAP[metric]
+    value = vehicle.get(field)
+
+    return {
+        "type": "realtime_metric",
+        "vehicle": vehicle.get("numberPlate"),
+        "metric": metric,
+        "available": value is not None,
+        "value": value
+    }
 
 
 def derive_vehicle_status(record):
@@ -47,59 +80,48 @@ def derive_vehicle_status(record):
         return "Stopped"
 
 
-def build_realtime_base(vehicle):
-    return {
+def build_realtime_status_response(vehicle):
+
+    response = {
+        "type": "realtime_status",
         "vehicle": vehicle.get("numberPlate"),
         "status": derive_vehicle_status(vehicle),
+        "last_updated": vehicle.get("lastUpdatedTime")
+    }
+
+    optional_fields = {
         "speed": vehicle.get("speed"),
-        "battery": vehicle.get("batteryLevel"),
+        "battery_level": vehicle.get("batteryLevel"),
         "fuel_capacity": vehicle.get("fuelCapacity"),
         "tanker_fuel_capacity": vehicle.get("TankerfuelCapacity"),
         "weight": vehicle.get("Weight"),
-        "driver": vehicle.get("driverName"),
-        "location": {
-            "lat": vehicle.get("lat"),
-            "lon": vehicle.get("lon")
-        }
+        "mileage": vehicle.get("mileage"),
+        "driver": vehicle.get("driverName")
     }
+
+    # Include ONLY non-null fields
+    response.update(optional_fields)
+
+    return response
+
+
 
 def build_realtime_response(intent, api_result):
 
     records = api_result.get("data", [])
 
-    vehicle = filter_vehicle_from_realtime(
-        records,
-        vehicle_id=intent.vehicle_id
-    )
+    if not records:
+        return error_response("No realtime data available")
+
+    vehicle = filter_vehicle_from_realtime(records, intent.vehicle_id)
 
     if not vehicle:
-        return {"error": "Vehicle not found"}
+        return error_response("Vehicle not found")
 
-    if intent.metric:
-        field = REALTIME_METRIC_MAP.get(intent.metric)
+    if intent.metric is not None:
+        return build_realtime_metric_response(vehicle, intent.metric)
 
-        if not field:
-            return {"error": f"Unsupported metric: {intent.metric}"}
-
-        return {
-            "type": "realtime_metric",
-            "vehicle": vehicle.get("numberPlate"),
-            "metric": intent.metric,
-            "value": vehicle.get(field)
-        }
-
-    if intent.intent_type == "realtime":
-        return {
-            "type": "realtime_status",
-            "vehicle": vehicle.get("numberPlate"),
-            "status": derive_vehicle_status(vehicle),
-            "last_updated": vehicle.get("lastUpdatedTime"),
-            "TankerfuelCapacity": vehicle.get("TankerfuelCapacity"),
-            "fuelCapacity": vehicle.get("fuelCapacity"),
-            "battery_level": vehicle.get("batteryLevel")
-        }
-
-    return build_realtime_base(vehicle)
+    return build_realtime_status_response(vehicle)
 
 
 
@@ -157,36 +179,27 @@ def compute_derived(rows):
     }
 
 
-REALTIME_METRIC_MAP = {
-    "speed": "speed",
-    "weight": "Weight",
-    "fuel_capacity": "fuelCapacity",
-    "tanker_fuel_capacity": "TankerfuelCapacity",
-    "battery": "batteryLevel"
-}
-
-
 def build_response(intent, api_result):
 
-    # 🔥 ROUTE: REALTIME
+    # -----------------------------
+    # REALTIME
+    # -----------------------------
     if intent.intent_type == "realtime":
         return build_realtime_response(intent, api_result)
 
-    # 🔥 ROUTE: ALERTS (future-safe)
-    # if intent.intent_type == "alert":
-        # return build_alert_response(intent, api_result)
-
-    # 🔥 DEFAULT: HISTORICAL
+    # -----------------------------
+    # HISTORICAL
+    # -----------------------------
     rows = api_result.get("dataRows", [])
     summary = api_result.get("summary", {})
 
     if not rows:
-        return {"error": "No data found"}
+        return error_response("No data found")
 
     plan = build_execution_plan(intent)
 
     # -----------------------------
-    # CASE 1: METRIC QUERY
+    # METRIC
     # -----------------------------
     if plan["need_metric"]:
         value = compute_metric(rows, plan["metric"], plan["aggregation"])
@@ -199,7 +212,7 @@ def build_response(intent, api_result):
         }
 
     # -----------------------------
-    # CASE 2: DETAILS QUERY
+    # SUMMARY
     # -----------------------------
     response = {
         "type": "summary",
