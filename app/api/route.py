@@ -18,10 +18,10 @@ def query_system(data: QueryRequest):
     if not data.query:
         return {"response": "Please provide query."}
     
-    company_id = data.company_id
+    company_id = 16
 
-    if not company_id:
-        return {"response": "Please provide company id."}
+    # if not company_id:
+    #     return {"response": "Please provide company id."}
     
     
     logger.info(f"Passed query: {data.query}")

@@ -18,7 +18,7 @@ if "history" not in st.session_state:
 # -------------------------
 st.sidebar.header("Configuration")
 
-company_id = st.sidebar.text_input("Company ID")
+# company_id = st.sidebar.text_input("Company ID")
 
 # -------------------------
 # Main Inputs
@@ -46,8 +46,8 @@ if submit:
     if not query.strip():
         st.warning("Query cannot be empty")
 
-    elif not company_id.strip():
-        st.warning("Company ID is required")
+    # elif not company_id.strip():
+    #     st.warning("Company ID is required")
 
     else:
         try:
@@ -56,8 +56,7 @@ if submit:
                 response = requests.post(
                     API_URL,
                     json={
-                        "query": query,
-                        "company_id": int(company_id)
+                        "query": query
                     },
                     headers={"Content-Type": "application/json"},
                     timeout=15

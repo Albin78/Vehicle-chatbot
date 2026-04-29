@@ -1,6 +1,9 @@
 import numpy as np
 from datetime import datetime
+from typing import Dict
+
 from app.tools.vehicle_resolver import normalize_vehicle_id
+
 
 
 REALTIME_METRIC_MAP = {
@@ -10,6 +13,27 @@ REALTIME_METRIC_MAP = {
     "tanker_fuel_capacity": "TankerfuelCapacity",
     "battery": "batteryLevel"
 }
+
+def detect_alert_analysis(query: str) -> str:
+    q = query.lower()
+
+    has_latest = any(w in q for w in ["latest", "last", "recent"])
+    has_count = any(w in q for w in ["how many", "count", "total", "number of"])
+    has_summary = any(w in q for w in ["report", "summary", "overview", "details"])
+
+    # Priority logic (IMPORTANT)
+    if has_count:
+        return "count"
+
+    if has_latest and not has_summary:
+        return "latest"
+
+    if has_summary:
+        return "summary"
+
+    # fallback
+    return "summary"
+
 
 
 def build_execution_plan(intent):
@@ -112,7 +136,7 @@ def build_realtime_response(intent, api_result):
     records = api_result.get("data", [])
 
     if not records:
-        return error_response("No realtime data available")
+        return error_response("No realtime data is currently available for this vehicle. Please try again shortly or verify the vehicle ID.")
 
     vehicle = filter_vehicle_from_realtime(records, intent.vehicle_id)
 
@@ -129,16 +153,74 @@ def parse_date(date_str):
     return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
 
 
-def build_alert_response(api_result):
+def build_alert_response(intent, api_result):
     alerts = api_result.get("results", [])
 
     if not alerts:
-        return error_response("No alerts found")
+        return error_response(f"No alerts found for vehicle id {intent.vehicle_id} in the given time range.")
 
-    latest = max(alerts, key=lambda x: parse_date(x.get("Date")))
+    alerts_sorted = sorted(
+        alerts,
+        key=lambda x: parse_date(x.get("Date")),
+        reverse=True
+    )
+
+    analysis = intent.analysis or "summary"
+
+    # -----------------------------
+    # LATEST
+    # -----------------------------
+    if analysis == "latest":
+        latest = alerts_sorted[0]
+
+        return {
+            "type": "alert_latest",
+            "alert_name": latest.get("AlertName"),
+            "time": latest.get("Date"),
+            "driver": latest.get("DriverName"),
+            "value": latest.get("CurrentValue"),
+            "duration": latest.get("Duration")
+        }
+
+    # -----------------------------
+    # COUNT
+    # -----------------------------
+    if analysis == "count":
+        return {
+            "type": "alert_count",
+            "total_alerts": len(alerts)
+        }
+
+    # -----------------------------
+    # SUMMARY
+    # -----------------------------
+    total_alerts = len(alerts)
+
+    
+    alert_types: Dict[str, int] = {}
+    max_value = 0
+    max_event = None
+
+    for alert in alerts:
+        name = alert.get("AlertName")
+        
+        if not name:
+            continue
+
+        alert_types[name] = alert_types.get(name, 0) + 1
+
+        value = alert.get("OrginalValue", 0)
+        if value > max_value:
+            max_value = value
+            max_event = alert
+
+    most_common = max(alert_types, key=lambda k: alert_types.get(k, 0))
+    latest = alerts_sorted[0]
 
     return {
         "type": "alert_summary",
+        "total_alerts": total_alerts,
+        "most_common_alert": most_common,
         "latest_alert": {
             "alert_name": latest.get("AlertName"),
             "time": latest.get("Date"),
@@ -146,7 +228,11 @@ def build_alert_response(api_result):
             "current_value": latest.get("CurrentValue"),
             "duration": latest.get("Duration")
         },
-        "total_alerts": len(alerts)
+        "peak_alert": {
+            "alert_name": max_event.get("AlertName") if max_event else None,
+            "value": max_event.get("CurrentValue") if max_event else None,
+            "time": max_event.get("Date") if max_event else None
+        }
     }
 
 
@@ -214,7 +300,7 @@ def build_response(intent, api_result):
     
     # Alert
     if intent.intent_type == "alert":
-        return build_alert_response(api_result)
+        return build_alert_response(intent, api_result)
     # -----------------------------
     # HISTORICAL
     # -----------------------------

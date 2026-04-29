@@ -1,6 +1,7 @@
 import re
 import calendar
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta    
+from typing import Union, Tuple, Optional
 
 
 
@@ -126,27 +127,45 @@ def extract_single_date(query: str):
 def extract_range_date(query: str):
     current_year = datetime.now().year
 
-    pattern = re.search(
-        r"(?:(\d{4})\s+)?"
+    # -----------------------------
+    # CASE 1: "april 1 to april 18"
+    # -----------------------------
+    pattern_full = re.search(
+        r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})\s+to\s+"
+        r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})"
+        r"(?:\s+(\d{4}))?",
+        query
+    )
+
+    if pattern_full:
+        m1, d1, m2, d2, year = pattern_full.groups()
+        year = int(year) if year else current_year
+
+        start = datetime(year, MONTH_MAP[m1[:3]], validate_day(year, MONTH_MAP[m1[:3]], int(d1)))
+        end = datetime(year, MONTH_MAP[m2[:3]], validate_day(year, MONTH_MAP[m2[:3]], int(d2)))
+
+        return (
+            start.strftime("%Y-%m-%d"),
+            end.strftime("%Y-%m-%d")
+        )
+
+    # -----------------------------
+    # CASE 2: "april 1 to 18"
+    # -----------------------------
+    pattern_same_month = re.search(
         r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+"
         r"(\d{1,2})\s+to\s+(\d{1,2})"
         r"(?:\s+(\d{4}))?",
         query
     )
 
-    if not pattern:
-        return None
+    if pattern_same_month:
+        month, d1, d2, year = pattern_same_month.groups()
+        year = int(year) if year else current_year
 
-    year_prefix, month, d1, d2, year_suffix = pattern.groups()
+        return build_date_range(year, month, d1, d2)
 
-    if year_prefix:
-        year = year_prefix
-    elif year_suffix:
-        year = year_suffix
-    else:
-        year = str(current_year)
-
-    return build_date_range(year, month, d1, d2)
+    return None
 
 
 def extract_time_range(query: str):
@@ -202,7 +221,6 @@ def format_time_range(time_range):
 
     return str(time_range)
 
-from datetime import datetime
 
 
 def parse_date(date_str: str) -> datetime | None:
@@ -223,3 +241,61 @@ def parse_date(date_str: str) -> datetime | None:
             continue
 
     return None
+
+
+def parse_any_datetime(value: str) -> Optional[datetime]:
+    try:
+        if "T" in value:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return datetime.strptime(value, "%Y-%m-%d")
+    except Exception:
+        return None
+
+
+def format_time_generate(time_range: Union[str, Tuple[str, str]]) -> str:
+    if not time_range:
+        return ""
+
+    try:
+        # -----------------------------
+        # CASE 1: Single value
+        # -----------------------------
+        if isinstance(time_range, str):
+            dt = parse_any_datetime(time_range)
+
+            if not dt:   # ✅ CRITICAL FIX
+                return ""
+
+            return dt.strftime("%B %d").replace(" 0", " ")
+
+        # -----------------------------
+        # CASE 2: Tuple
+        # -----------------------------
+        if isinstance(time_range, tuple):
+            start, end = time_range
+
+            start_dt = parse_any_datetime(start) if start else None
+            end_dt = parse_any_datetime(end) if end else None
+
+            # ✅ FIX: Guard before usage
+            if not start_dt:
+                return ""
+
+            start_fmt = start_dt.strftime("%B %d").replace(" 0", " ")
+
+            # Only start exists
+            if not end_dt:
+                return start_fmt
+
+            # Same day
+            if start_dt.date() == end_dt.date():
+                return start_fmt
+
+            end_fmt = end_dt.strftime("%B %d").replace(" 0", " ")
+
+            return f"{start_fmt} to {end_fmt}"
+
+    except Exception:
+        return ""
+
+    return ""

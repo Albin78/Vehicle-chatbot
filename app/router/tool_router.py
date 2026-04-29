@@ -56,6 +56,7 @@ def route_tool(intent, plan, company_id):
             logger.info("[ROUTER] Routing to Alert API")
 
             parsed = extract_time_range(plan.time_range)
+            logger.info(f"Date formatted fetched in backend: {parsed}")
             if not parsed:
                 return {"type": "error", "message": "Time range required for alerts"}
 
@@ -80,6 +81,8 @@ def route_tool(intent, plan, company_id):
             logger.info("[ROUTER] Routing to Operation Summary API")
 
             parsed = extract_time_range(plan.time_range)
+            logger.info(f"Date formatted fetched in backend: {parsed}")
+            
             if not parsed:
                 return {"type": "error", "message": "Time range required"}
 

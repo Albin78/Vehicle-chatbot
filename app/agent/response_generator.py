@@ -1,56 +1,10 @@
 from app.llm.ollama_client import OllamaClient
-from app.utils.logger import logger
 from datetime import datetime
+from app.parsers.date_parser import format_time_generate
+from app.utils.logger import logger
 
 llm = OllamaClient()
 
-
-from datetime import datetime
-from typing import Union, Tuple
-
-def format_time_range(time_range: Union[str, Tuple[str, str]]) -> str:
-    if not time_range:
-        return ""
-
-    try:
-        # -----------------------------
-        # CASE 1: Single date string
-        # -----------------------------
-        if isinstance(time_range, str):
-            dt = datetime.strptime(time_range, "%Y-%m-%d")
-            return dt.strftime("%B %d").replace(" 0", " ")
-
-        # -----------------------------
-        # CASE 2: Tuple (range)
-        # -----------------------------
-        if isinstance(time_range, tuple):
-            start, end = time_range
-
-            if not start:
-                return ""
-
-            start_date = datetime.strptime(start, "%Y-%m-%d")
-
-            # If end is missing → treat as single
-            if not end:
-                return start_date.strftime("%B %d").replace(" 0", " ")
-
-            end_date = datetime.strptime(end, "%Y-%m-%d")
-
-            # Same date → single output
-            if start_date == end_date:
-                return start_date.strftime("%B %d").replace(" 0", " ")
-
-            # Range output
-            start_fmt = start_date.strftime("%B %d").replace(" 0", " ")
-            end_fmt = end_date.strftime("%B %d").replace(" 0", " ")
-
-            return f"{start_fmt} to {end_fmt}"
-
-    except Exception:
-        return ""
-
-    return ""
 
 
 def get_unit(metric):
@@ -71,7 +25,7 @@ def build_user_message(result, intent):
 
     time_context = ""
     if intent.time_range:
-        timestamp_to_date = format_time_range(intent.time_range)
+        timestamp_to_date = format_time_generate(intent.time_range)
         time_context = f" for the time range {timestamp_to_date}"
 
     result_type = result.get("type")
@@ -88,36 +42,95 @@ def build_user_message(result, intent):
         return (
             f"The current {metric} of vehicle {result.get('vehicle')} "
             f"is {value} {unit}."
-        ) 
+        )
     
-    if result_type == "alert_summary":
-
-        latest = result.get("latest_alert", {})
+    if result_type == "alert_latest":
 
         parts = []
 
         parts.append(
-            f"The latest {latest.get('alert_name')} alert"
+            f"The latest {result.get('alert_name')} alert"
         )
 
-        if latest.get("time"):
-            time = latest.get('Date')
-            time = format_time_range(time)
-            logger.info(f"Changed time format using custom function: {time}")
-            parts.append(f"occurred at {time}")
+        if result.get("time"):
+            formatted_time = format_time_generate(result.get("time"))
+            parts.append(f"occurred on {formatted_time}")
 
-        if latest.get("driver"):
-            parts.append(f"with driver {latest.get('driver')}")
+        if result.get("driver"):
+            parts.append(f"with driver {result.get('driver')}")
 
-        if latest.get("current_value"):
-            parts.append(f"value was {latest.get('current_value')}")
+        if result.get("value"):
+            parts.append(f"recorded a value of {result.get('value')}")
 
-        if latest.get("duration"):
-            parts.append(f"lasting {latest.get('duration')}")
+        if result.get("duration"):
+            parts.append(f"lasting {result.get('duration')}")
 
-        if result.get("total_alerts") is not None:
-            parts.append(f"total alerts are {result.get('total_alerts')}")
         return ", ".join(parts) + "."
+    
+
+    
+    if result_type == "alert_count":
+
+        total = result.get("total_alerts", 0)
+
+        return f"A total of {total} alerts were recorded for the given vehicle in the selected time range."
+    
+
+    
+    if result_type == "alert_summary":
+
+        latest = result.get("latest_alert", {})
+        peak = result.get("peak_alert", {})
+
+        parts = []
+
+        # Total alerts
+        if result.get("total_alerts") is not None:
+            parts.append(f"A total of {result.get('total_alerts')} alerts were recorded")
+
+        # Most common alert
+        if result.get("most_common_alert"):
+            parts.append(f"with {result.get('most_common_alert')} being the most frequent")
+
+        # Latest alert
+        if latest:
+            latest_parts = []
+
+            latest_parts.append(f"the most recent alert was {latest.get('alert_name')}")
+
+            if latest.get("time"):
+                formatted_time = format_time_generate(latest.get("time"))
+                logger.info(f"The timestamp taken from alert api data: {latest.get('time')} and Converted timestamp to str: {formatted_time}")
+                latest_parts.append(f"on {formatted_time}")
+
+            if latest.get("driver"):
+                latest_parts.append(f"by driver {latest.get('driver')}")
+
+            if latest.get("current_value"):
+                latest_parts.append(f"with a value of {latest.get('current_value')}")
+
+            if latest.get("duration"):
+                latest_parts.append(f"lasting {latest.get('duration')}")
+
+            parts.append(" ".join(latest_parts))
+
+        # Peak alert
+        if peak:
+            peak_parts = []
+
+            peak_parts.append(f"the highest severity alert recorded was {peak.get('alert_name')}")
+
+            if peak.get("value"):
+                peak_parts.append(f"with a value of {peak.get('value')}")
+
+            if peak.get("time"):
+                formatted_time = format_time_generate(peak.get("time"))
+                peak_parts.append(f"on {formatted_time}")
+
+            parts.append(" ".join(peak_parts))
+
+        return ". ".join(parts) + "."
+    
 
 
     if result_type == "realtime_status":
@@ -144,7 +157,7 @@ def build_user_message(result, intent):
         if "tanker_fuel_capacity" in result:
             parts.append(f"tanker capacity is {result['tanker_fuel_capacity']} L")
 
-        if "weight" in result:
+        if "weight" in result and result["weight"] is not None:
             parts.append(f"weight is {result['weight']} kg")
 
         if "driver" in result:
@@ -181,7 +194,8 @@ def build_user_message(result, intent):
         return (
             f"Vehicle {intent.vehicle_id}{time_context} traveled "
             f"{result.get('total_distance')} km with an average speed of "
-            f"{result.get('average_speed')} km/h and engine hours "
+            f"{result.get('average_speed')} km/h, total moving time of {result.get('total_moving_time')} "
+            f" total idl time {result.get('total_idle_time')} and engine hours "
             f"{result.get('engine_hours')}."
         )
 
@@ -200,26 +214,28 @@ def generate_response(result, intent):
     prompt = f"""
 You are a strict response formatter.
 
-Rewrite the sentence ONLY for grammar and readability.
+Your task is to rewrite the sentence ONLY for grammar and readability.
 
 ----------------------------------------
 INPUT:
 {base_message}
 ----------------------------------------
 
-CRITICAL RULES:
+STRICT RULES (MANDATORY):
 
-- You MUST NOT remove ANY information
-- You MUST NOT shorten the sentence
-- You MUST include EVERY field mentioned
-- You MUST keep ALL numbers EXACT
-- You MUST keep ALL units EXACT
-- Output must contain SAME number of data points as input
-- Do NOT summarize
+- Output EXACTLY one sentence
+- Do NOT add any explanation
+- Do NOT include phrases like "Here is the rewritten version"
+- Do NOT add new information
+- Do NOT infer or summarize anything
+- Do NOT remove any information
+- Preserve ALL values, numbers, units, and names EXACTLY
+- Preserve ALL data points present in the input
+- Only fix grammar and sentence flow
 
 ----------------------------------------
 
-Return EXACTLY one sentence.
+OUTPUT:
 """
 
     return llm.generate(prompt)
