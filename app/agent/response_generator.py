@@ -1,11 +1,19 @@
 from app.llm.ollama_client import OllamaClient
-from datetime import datetime
 from app.parsers.date_parser import format_time_generate
 from app.utils.logger import logger
+import re
+
 
 llm = OllamaClient()
 
 
+
+def clean_driver_name(driver: str | None) -> str | None:
+    if not driver:
+        return driver
+
+    # Remove anything inside parentheses
+    return re.sub(r"\s*\(.*?\)", "", driver).strip()
 
 def get_unit(metric):
     unit_map = {
@@ -16,6 +24,20 @@ def get_unit(metric):
     }
     return unit_map.get(metric, "")
 
+
+def metric_not_available_response(metric: str, vehicle: str) -> str:
+    suggestions = {
+        "weight": "You can check speed, battery status, or fuel details instead.",
+        "battery": "You can check speed or fuel details instead.",
+        "speed": "You can check battery or fuel details instead.",
+    }
+
+    suggestion_text = suggestions.get(metric, "Try asking for other vehicle details.")
+
+    return (
+        f"I couldn't find the current {metric} data for vehicle {vehicle}. "
+        f"{suggestion_text}"
+    )
 
 
 def build_user_message(result, intent):
@@ -34,13 +56,18 @@ def build_user_message(result, intent):
     # REALTIME METRIC
     # -----------------------------
     if result_type == "realtime_metric":
-        metric = result.get("metric")
+        metric = result.get("metric") or intent.metric or "data"
         value = result.get("value")
+        vehicle = result.get("vehicle")
+
+        # 🚨 CRITICAL FIX
+        if value is None:
+            return metric_not_available_response(metric, vehicle)
 
         unit = get_unit(metric)
 
         return (
-            f"The current {metric} of vehicle {result.get('vehicle')} "
+            f"The current {metric} of vehicle {vehicle} "
             f"is {value} {unit}."
         )
     
@@ -141,8 +168,8 @@ def build_user_message(result, intent):
             f"The vehicle {result.get('vehicle')} is {result.get('status')}"
         )
 
-        if result.get("last_updated"):
-            parts.append(f"(last updated {result.get('last_updated')})")
+        # if result.get("last_updated"):
+        #     parts.append(f"(last updated {result.get('last_updated')})")
 
         # dynamic fields
         if "speed" in result:
@@ -157,11 +184,15 @@ def build_user_message(result, intent):
         if "tanker_fuel_capacity" in result:
             parts.append(f"tanker capacity is {result['tanker_fuel_capacity']} L")
 
-        if "weight" in result and result["weight"] is not None:
-            parts.append(f"weight is {result['weight']} kg")
+        if "weight" in result:
+            if result["weight"] is not None:
+                parts.append(f"weight is {result['weight']} kg")
+            else:
+                parts.append("weight data is currently unavailable")
 
         if "driver" in result:
-            parts.append(f"driver is {result['driver']}")
+            driver_clean = clean_driver_name(result["driver"])
+            parts.append(f"driver is {driver_clean}")
 
         return ", ".join(parts) + "."
     
@@ -170,9 +201,10 @@ def build_user_message(result, intent):
     # -----------------------------
     if result_type == "metric":
         value = result.get("value")
+        metric = result.get("metric") or intent.metric or "data"
 
         if value is None:
-            return "I couldn't find data for the requested metric."
+            return metric_not_available_response(metric, result.get("vehicle"))
 
         unit = get_unit(intent.metric)
 
@@ -192,7 +224,8 @@ def build_user_message(result, intent):
     # -----------------------------
     if result_type == "summary":
         return (
-            f"Vehicle {intent.vehicle_id}{time_context} traveled "
+            f"Vehicle {intent.vehicle_id} of type {result.get('vehicle_type')} belongs to group {result.get('group')}"
+            f"for time range {time_context} traveled "
             f"{result.get('total_distance')} km with an average speed of "
             f"{result.get('average_speed')} km/h, total moving time of {result.get('total_moving_time')} "
             f" total idl time {result.get('total_idle_time')} and engine hours "

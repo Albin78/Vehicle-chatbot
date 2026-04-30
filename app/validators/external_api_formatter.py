@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Dict
 
 from app.tools.vehicle_resolver import normalize_vehicle_id
+from app.utils.logger import logger
 
 
 
@@ -55,6 +56,7 @@ def error_response(message):
 
 def filter_vehicle_from_realtime(data, vehicle_id):
     normalized_input = normalize_vehicle_id(vehicle_id)
+    logger.info(f"Normalized vehicle id using normalize function: {normalized_input}")
 
     for record in data:
         plate = normalize_vehicle_id(record.get("numberPlate"))
@@ -141,7 +143,7 @@ def build_realtime_response(intent, api_result):
     vehicle = filter_vehicle_from_realtime(records, intent.vehicle_id)
 
     if not vehicle:
-        return error_response("Vehicle not found")
+        return error_response("Vehicle not found or may be mismatch in vehicle id given or extraction.")
 
     if intent.metric is not None:
         return build_realtime_metric_response(vehicle, intent.metric)

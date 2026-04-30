@@ -16,7 +16,7 @@ if "history" not in st.session_state:
 # -------------------------
 # Sidebar (Better UX for system inputs)
 # -------------------------
-st.sidebar.header("Configuration")
+# st.sidebar.header("Configuration")
 
 # company_id = st.sidebar.text_input("Company ID")
 
