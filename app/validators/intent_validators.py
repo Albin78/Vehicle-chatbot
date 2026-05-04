@@ -3,7 +3,7 @@ import re
 from app.utils.logger import logger
 from app.db.mongoclient import get_db_fields
 
-# --------------------------------------------------
+
 # DEFAULT SAFE INTENT (FALLBACK)
 # --------------------------------------------------
 DEFAULT_INTENT = {
@@ -23,7 +23,8 @@ REALTIME_ALLOWED_METRICS = {
     "fuel_capacity",
     "tanker_fuel_capacity",
     "weight",
-    "mileage"
+    "mileage",
+    "fuel_level"
 }
 
 METRIC_SYNONYMS = {
@@ -32,8 +33,14 @@ METRIC_SYNONYMS = {
     "battery status": "battery",
     "battery voltage": "battery",
 
-    "fuel": "fuel_capacity",
-    "fuel level": "fuel_capacity",
+    
+    "fuel level": "fuel_level",
+    "fuel status": "fuel_level",
+    "current fuel": "fuel_level",
+    "fuel remaining": "fuel_level",
+
+    "fuel capacity": "fuel_capacity",
+    "tank capacity": "fuel_capacity",
 
     "tanker": "tanker_fuel_capacity",
     "tanker capacity": "tanker_fuel_capacity",
@@ -59,7 +66,7 @@ VALID_VEHICLE_ID_PATTERN = re.compile(
 
 fields = get_db_fields()
 
-HISTORICAL_ALLOWED_METRICS = set(fields)  # from DB
+HISTORICAL_ALLOWED_METRICS = set(fields)  
 
 
 def normalize_metric(metric: str | None, query: str) -> str | None:
@@ -72,12 +79,21 @@ def normalize_metric(metric: str | None, query: str) -> str | None:
         if metric in METRIC_SYNONYMS:
             return METRIC_SYNONYMS[metric]
 
-    # Try to infer from query phrases
-    for phrase, canonical in METRIC_SYNONYMS.items():
-        if phrase in q:
-            return canonical
 
-    return metric
+        if metric == "fuel":
+            if any(word in q for word in ["level", "status", "current", "remaining"]):
+                return "fuel_level"
+            elif any(word in q for word in ["capacity", "tank"]):
+                return "fuel_capacity"
+            else:
+                return "fuel_level"  
+
+        # Try to infer from query phrases
+        for phrase, canonical in METRIC_SYNONYMS.items():
+            if phrase in q:
+                return canonical
+
+        return metric
 
 # --------------------------------------------------
 # RULE-BASED VEHICLE ID EXTRACTION (STRONG FALLBACK)
@@ -92,7 +108,9 @@ def extract_vehicle_id_rule_based(query: str) -> str | None:
     return re.sub(r"\s+", "", raw)
 
 
-def is_valid_vehicle_id(vid: str) -> bool:
+def is_valid_vehicle_id(vid) -> bool:
+    if not isinstance(vid, str):
+        return False
     return bool(VALID_VEHICLE_ID_PATTERN.match(vid))
 
 
@@ -138,7 +156,6 @@ def extract_aggregation_rule_based(query: str) -> str | None:
     return None
 
 
-# --------------------------------------------------
 # SANITIZE LLM OUTPUT
 # --------------------------------------------------
 def sanitize_llm_output(raw: str) -> dict:
@@ -165,6 +182,15 @@ def sanitize_llm_output(raw: str) -> dict:
         return DEFAULT_INTENT
 
     clean_data = {}
+    
+    vid = clean_data.get("vehicle_id")
+
+    if vid is not None:
+        try:
+            clean_data["vehicle_id"] = str(vid)
+        except Exception:
+            logger.warning(f"Invalid vehicle_id format: {vid}")
+            clean_data["vehicle_id"] = None
 
     for key in DEFAULT_INTENT.keys():
         value = data.get(key, None)
@@ -201,7 +227,14 @@ def is_metric_in_query(query: str, metric: str) -> bool:
 
 def extract_metric_rule_based(query: str) -> str | None:
     q = query.lower()
+    
+    # PRIORITY MATCH (before generic)
+    if any(word in q for word in ["fuel level", "fuel status", "current fuel", "fuel remaining"]):
+        return "fuel_level"
 
+    if "fuel capacity" in q or "tank capacity" in q:
+        return "fuel_capacity"
+    
     # First check synonyms (stronger)
     for phrase, canonical in METRIC_SYNONYMS.items():
         if phrase in q:
@@ -312,90 +345,107 @@ def detect_intent_type(query: str, clean_data: dict) -> str | None:
 # --------------------------------------------------
 def post_validate(clean_data: dict, query: str, fields: list) -> dict:
 
-   # -----------------------------
-# VEHICLE ID RESOLUTION (FINAL FIX)
-# -----------------------------
-    resolved_vid = resolve_vehicle_id(clean_data, query)
+    # -----------------------------
+    # VEHICLE ID RESOLUTION (FINAL FIX)
+    # -----------------------------
+    
+    try:
+        resolved_vid = resolve_vehicle_id(clean_data, query)
 
-    if resolved_vid:
-        if clean_data.get("vehicle_id") != resolved_vid:
-            logger.info(f"Corrected vehicle_id from {clean_data.get('vehicle_id')} → {resolved_vid}")
-        clean_data["vehicle_id"] = resolved_vid
-    else:
-        logger.warning(f"Failed to resolve vehicle_id from query: {query}")
-        clean_data["vehicle_id"] = None
+        if resolved_vid:
+            if clean_data.get("vehicle_id") != resolved_vid:
+                logger.info(f"Corrected vehicle_id from {clean_data.get('vehicle_id')} → {resolved_vid}")
+            clean_data["vehicle_id"] = resolved_vid
+        else:
+            logger.warning(f"Failed to resolve vehicle_id from query: {query}")
+            clean_data["vehicle_id"] = None
+        
+
+        # -----------------------------
+        # METRIC FALLBACK (CRITICAL FIX)
+        # -----------------------------
+        if not clean_data.get("metric"):
+            fallback_metric = extract_metric_rule_based(query)
+
+            if fallback_metric:
+                logger.info(f"Recovered metric from query: {fallback_metric}")
+                clean_data["metric"] = fallback_metric
+        
+
+        clean_data["metric"] = normalize_metric(
+        clean_data.get("metric"),
+        query
+    )
+        
+        # METRIC VALIDATION
+        # -----------------------------
+        clean_data["metric"] = validate_metric(
+        clean_data.get("metric"),
+        query,
+        clean_data,
+        fields
+    )
+
+        # -----------------------------
+        # AGGREGATION VALIDATION
+        # -----------------------------
+        if clean_data.get("aggregation") and not clean_data.get("metric"):
+            clean_data["aggregation"] = None
+
+        if clean_data.get("metric"):  # only if metric exists
+            rule_based_agg = extract_aggregation_rule_based(query)
+
+            if rule_based_agg:
+                if clean_data.get("aggregation") != rule_based_agg:
+                    logger.warning(
+                        f"Corrected aggregation from {clean_data.get('aggregation')} → {rule_based_agg}"
+                    )
+                clean_data["aggregation"] = rule_based_agg
     
 
-    # -----------------------------
-    # METRIC FALLBACK (CRITICAL FIX)
-    # -----------------------------
-    if not clean_data.get("metric"):
-        fallback_metric = extract_metric_rule_based(query)
+        # INTENT TYPE DETECTION (CRITICAL)
+        # -----------------------------
+        rule_intent = detect_intent_type(query, clean_data)
+        llm_intent = clean_data.get("intent_type")
 
-        if fallback_metric:
-            logger.info(f"Recovered metric from query: {fallback_metric}")
-            clean_data["metric"] = fallback_metric
-    
-
-    clean_data["metric"] = normalize_metric(
-    clean_data.get("metric"),
-    query
-)
-    
-    # METRIC VALIDATION
-    # -----------------------------
-    clean_data["metric"] = validate_metric(
-    clean_data.get("metric"),
-    query,
-    clean_data,
-    fields
-)
-
-    # -----------------------------
-    # AGGREGATION VALIDATION
-    # -----------------------------
-    if clean_data.get("aggregation") and not clean_data.get("metric"):
-        clean_data["aggregation"] = None
-
-    if clean_data.get("metric"):  # only if metric exists
-        rule_based_agg = extract_aggregation_rule_based(query)
-
-        if rule_based_agg:
-            if clean_data.get("aggregation") != rule_based_agg:
+        if rule_intent:
+            if llm_intent != rule_intent:
                 logger.warning(
-                    f"Corrected aggregation from {clean_data.get('aggregation')} → {rule_based_agg}"
+                    f"Corrected intent_type from {llm_intent} → {rule_intent}"
                 )
-            clean_data["aggregation"] = rule_based_agg
-  
-
-    # INTENT TYPE DETECTION (CRITICAL)
-    # -----------------------------
-    rule_intent = detect_intent_type(query, clean_data)
-    llm_intent = clean_data.get("intent_type")
-
-    if rule_intent:
-        if llm_intent != rule_intent:
-            logger.warning(
-                f"Corrected intent_type from {llm_intent} → {rule_intent}"
-            )
-        clean_data["intent_type"] = rule_intent
-    else:
-        clean_data["intent_type"] = llm_intent
+            clean_data["intent_type"] = rule_intent
+        else:
+            clean_data["intent_type"] = llm_intent
 
 
-    # TIME RANGE NORMALIZATION
-    # -----------------------------
-    tr = clean_data.get("time_range")
+        # TIME RANGE NORMALIZATION
+        # -----------------------------
+        tr = clean_data.get("time_range")
 
-    if isinstance(tr, str):
-        tr = tr.lower().strip()
+        if isinstance(tr, str):
+            tr = tr.lower().strip()
 
-        # Normalize patterns
-        tr = re.sub(r"between (.+?) and (.+)", r"\1 to \2", tr)
-        tr = re.sub(r"from (.+?) to (.+)", r"\1 to \2", tr)
-        tr = re.sub(r"(\w+ \d+)-(\d+)", r"\1 to \2", tr)
+            # Normalize patterns
+            tr = re.sub(r"between (.+?) and (.+)", r"\1 to \2", tr)
+            tr = re.sub(r"from (.+?) to (.+)", r"\1 to \2", tr)
+            tr = re.sub(r"(\w+ \d+)-(\d+)", r"\1 to \2", tr)
 
-        clean_data["time_range"] = tr
+            clean_data["time_range"] = tr
 
-    return clean_data
+        return clean_data
+    
+    except Exception as e:
+        logger.error(f"[POST_VALIDATE ERROR] {e}", exc_info=True)
+
+        return {
+            "action": "fetch",
+            "vehicle_id": None,
+            "metric": None,
+            "aggregation": None,
+            "analysis": None,
+            "time_range": None,
+            "intent_type": None,
+            "service": None,
+            "error": "Intent processing failed. Please try again."
+        }
 

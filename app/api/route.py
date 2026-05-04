@@ -26,7 +26,23 @@ def query_system(data: QueryRequest):
     
     logger.info(f"Passed query: {data.query}")
 
-    intent = extract_intent(data.query)
+    try:
+        intent = extract_intent(data.query)
+
+        if isinstance(intent, dict) and intent.get("error"):
+            return {
+                "status": "error",
+                "message": intent["error"]
+        }
+
+    except Exception as e:
+        logger.error(f"[API ERROR] {e}", exc_info=True)
+
+        return {
+            "status": "error",
+            "message": "Something went wrong while processing your request. Please try again."
+        }
+    
         
     logger.info(f"Intent: {intent}")
     logger.info(f"Intent vehicle id: {intent.vehicle_id}")

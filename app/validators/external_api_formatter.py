@@ -12,7 +12,8 @@ REALTIME_METRIC_MAP = {
     "weight": "Weight",
     "fuel_capacity": "fuelCapacity",
     "tanker_fuel_capacity": "TankerfuelCapacity",
-    "battery": "batteryLevel"
+    "battery": "batteryLevel",
+    "fuel_level": "fuelLevel"
 }
 
 def detect_alert_analysis(query: str) -> str:
@@ -120,6 +121,7 @@ def build_realtime_status_response(vehicle):
         "speed": vehicle.get("speed"),
         "battery_level": vehicle.get("batteryLevel"),
         "fuel_capacity": vehicle.get("fuelCapacity"),
+        "fuel_level": vehicle.get("fuelLevel"),
         "tanker_fuel_capacity": vehicle.get("TankerfuelCapacity"),
         "weight": vehicle.get("Weight"),
         "mileage": vehicle.get("mileage"),

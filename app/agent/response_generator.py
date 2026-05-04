@@ -30,6 +30,7 @@ def metric_not_available_response(metric: str, vehicle: str) -> str:
         "weight": "You can check speed, battery status, or fuel details instead.",
         "battery": "You can check speed or fuel details instead.",
         "speed": "You can check battery or fuel details instead.",
+        "fuel_level": "You can check battery or fuel details instead."
     }
 
     suggestion_text = suggestions.get(metric, "Try asking for other vehicle details.")
@@ -183,6 +184,10 @@ def build_user_message(result, intent):
 
         if "tanker_fuel_capacity" in result:
             parts.append(f"tanker capacity is {result['tanker_fuel_capacity']} L")
+        
+        if "fuellitre" in result and "fuelLevel" in result:
+            if result["fuelLevel"] and result["fuellitre"]:
+                parts.append(f"fuel level is {result['fuelLevel']} and fuel level in litres is {result['fuellitre']} litres")
 
         if "weight" in result:
             if result["weight"] is not None:
