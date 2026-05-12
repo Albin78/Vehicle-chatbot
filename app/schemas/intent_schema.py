@@ -1,130 +1,178 @@
 import re
+
 from typing import Optional
-from pydantic import BaseModel, field_validator, model_validator
+from typing import Literal
+
+from pydantic import BaseModel
+from pydantic import field_validator
+from pydantic import model_validator
 
 
+VALID_SOURCES = {
+    "latest",
+    "summary",
+    "alert"
+}
 
-def _normalize_keywords(v: str) -> str:
-    v = v.lower()
+VALID_ALERT_ANALYSIS = {
+    "latest",
+    "count",
+    "summary"
+}
 
-    # normalize variants
-    v = re.sub(r"\bin\s+between\b", "between", v)
-    v = re.sub(r"\bbetween\s+in\b", "between", v)
-
-    # normalize connectors
-    v = re.sub(r"\btill\b|\buntil\b|\bthrough\b", "to", v)
-
-    # normalize hyphen
-    v = re.sub(r"\s*-\s*", " to ", v)
-
-    # normalize "between X and Y" → "X to Y"
-    v = re.sub(r"between\s+(.+?)\s+and\s+(.+)", r"\1 to \2", v)
-
-    # normalize "from X to Y" → "X to Y"
-    v = re.sub(r"from\s+(.+?)\s+to\s+(.+)", r"\1 to \2", v)
-
-    return v
-
-
-# def _extract_date_range(v: str) -> str | None:
-#     """
-#     Extract structured date range into canonical format.
-#     """
-
-#     # Pattern 1: april 1 to 10
-#     m = re.search(r"([a-z]+\s+\d{1,2})\s+to\s+(\d{1,2})", v)
-#     if m:
-#         return f"{m.group(1)} to {m.group(2)}"
-
-#     # Pattern 2: 1 april to 10 april
-#     m = re.search(r"(\d{1,2}\s+[a-z]+)\s+to\s+(\d{1,2}\s+[a-z]+)", v)
-#     if m:
-#         return f"{m.group(1)} to {m.group(2)}"
-
-#     return None
+VALID_AGGREGATIONS = {
+    "minimum",
+    "maximum",
+    "average"
+}
 
 
 class QueryIntent(BaseModel):
-    action: Optional[str] = None
+
+    # ---------------------------------
+    # BASIC
+    # ---------------------------------
+    action: Literal["fetch", "update", "delete"] = "fetch"
+
     vehicle_id: Optional[str] = None
-    metric: Optional[str] = None
-    aggregation: Optional[str] = None
-    analysis: Optional[str] = None
+
+    # ---------------------------------
+    # PAYLOAD SOURCE
+    # ---------------------------------
+    source: Optional[
+        Literal[
+            "latest",
+            "summary",
+            "alert"
+        ]
+    ] = None
+
+    # ---------------------------------
+    # MULTI-METRIC SUPPORT
+    # ---------------------------------
+    metrics: list[str] = []
+
+    # ---------------------------------
+    # ANALYTICS
+    # ---------------------------------
+    aggregation: Optional[
+        Literal[
+            "minimum",
+            "maximum",
+            "average"
+        ]
+    ] = None
+
+    # ---------------------------------
+    # ALERT ANALYSIS
+    # ---------------------------------
+    alert_analysis: Optional[
+        Literal[
+            "latest",
+            "count",
+            "summary"
+        ]
+    ] = None
+
+    # ---------------------------------
+    # TIME RANGE
+    # ---------------------------------
     time_range: Optional[tuple[str, str]] = None
-    service: Optional[str] = None
-    intent_type: Optional[str]
 
+    # ---------------------------------
+    # CURRENT STATUS REQUEST
+    # ---------------------------------
+    summary_requested: bool = False
 
-    # -----------------------------
+    # ==========================================
     # CLEAN NULL STRINGS
-    # -----------------------------
+    # ==========================================
     @field_validator("*", mode="before")
     @classmethod
     def clean_null_strings(cls, v):
-        if isinstance(v, str) and v.strip().lower() in {"null", "none", ""}:
-            return None
+
+        if isinstance(v, str):
+
+            if v.strip().lower() in {
+                "null",
+                "none",
+                ""
+            }:
+                return None
+
         return v
 
-
-    # -----------------------------
-    # VEHICLE ID VALIDATION (STRICT)
-    # -----------------------------
+    # ==========================================
+    # VEHICLE NORMALIZATION
+    # ==========================================
     @field_validator("vehicle_id", mode="before")
     @classmethod
     def normalize_vehicle_id(cls, v):
+
         if isinstance(v, str):
-            return re.sub(r"\s+", "", v).upper()
+            return re.sub(
+                r"\s+",
+                "",
+                v
+            ).upper()
+
         return v
 
-
-    # -----------------------------
-    # METRIC NORMALIZATION
-    # -----------------------------
-    @field_validator("metric", mode="before")
+    # ==========================================
+    # METRICS NORMALIZATION
+    # ==========================================
+    @field_validator("metrics", mode="before")
     @classmethod
-    def normalize_metric(cls, v):
+    def normalize_metrics(cls, v):
+
+        if v is None:
+            return []
+
         if isinstance(v, str):
-            return v.strip().lower()
-        return v
+            v = [v]
 
+        if not isinstance(v, list):
+            return []
 
-    # -----------------------------
-    # TIME RANGE NORMALIZATION
-    # -----------------------------
-    @field_validator("time_range", mode="before")
-    @classmethod
-    def normalize_time_range(cls, v):
-        if not isinstance(v, str):
-            return v
+        normalized = []
 
-        v = v.strip().lower()
+        for metric in v:
 
-        # Step 1: normalize noisy language
-        v = _normalize_keywords(v)
+            if isinstance(metric, str):
 
-        return v
+                metric = (
+                    metric
+                    .strip()
+                    .lower()
+                )
 
-        # # Step 2: extract structured range
-        # parsed = _extract_date_range(v)
+                if metric:
+                    normalized.append(metric)
 
-        # return parsed
+        return list(set(normalized))
 
-
-    # -----------------------------
+    # ==========================================
     # BUSINESS RULES
-    # -----------------------------
+    # ==========================================
     @model_validator(mode="after")
-    def enforce_rules(self):
+    def validate_business_rules(self):
 
-        metric_exists = self.metric is not None
-        vehicle_exists = self.vehicle_id is not None
-
-        # Aggregation requires metric
-        if self.aggregation and not metric_exists:
+        # ---------------------------------
+        # Aggregation requires metrics
+        # ---------------------------------
+        if self.aggregation and not self.metrics:
             self.aggregation = None
 
-        # Action default
-        if self.action not in {"fetch", "update", "delete"}:
-            self.action = "fetch"
+        # ---------------------------------
+        # Alert analysis only for alerts
+        # ---------------------------------
+        if self.source != "alert":
+            self.alert_analysis = None
+
+        # ---------------------------------
+        # summary_requested only for latest
+        # ---------------------------------
+        if self.source != "latest":
+            self.summary_requested = False
 
         return self
