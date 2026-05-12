@@ -83,6 +83,9 @@ def build_user_message(result, intent):
         if result.get("time"):
             formatted_time = format_time_generate(result.get("time"))
             parts.append(f"occurred on {formatted_time}")
+        
+        if result.get("limit"):
+            parts.append(f"allowed speed limit is {result.get('limit')}")
 
         if result.get("driver"):
             parts.append(f"with driver {result.get('driver')}")
@@ -136,6 +139,9 @@ def build_user_message(result, intent):
 
             if latest.get("current_value"):
                 latest_parts.append(f"with a value of {latest.get('current_value')}")
+            
+            if latest.get("limit") is not None:
+                latest_parts.append(f"while allowed speed limit is {latest.get('limit')}")
 
             if latest.get("duration"):
                 latest_parts.append(f"lasting {latest.get('duration')}")
@@ -150,6 +156,9 @@ def build_user_message(result, intent):
 
             if peak.get("value"):
                 peak_parts.append(f"with a value of {peak.get('value')}")
+            
+            if peak.get("limit") is not None:
+                peak_parts.append(f"while allowed speed limit is {peak.get('limit')}")
 
             if peak.get("time"):
                 formatted_time = format_time_generate(peak.get("time"))
@@ -193,7 +202,7 @@ def build_user_message(result, intent):
             if result["weight"] is not None:
                 parts.append(f"weight is {result['weight']} kg")
             else:
-                parts.append("weight data is currently unavailable")
+                parts.append("weight data is currently unavailable.")
 
         if "driver" in result:
             driver_clean = clean_driver_name(result["driver"])
@@ -228,13 +237,14 @@ def build_user_message(result, intent):
     # SUMMARY
     # -----------------------------
     if result_type == "summary":
+        
         return (
-            f"Vehicle {intent.vehicle_id} of type {result.get('vehicle_type')} belongs to group {result.get('group')}"
-            f"for time range {time_context} traveled "
-            f"{result.get('total_distance')} km with an average speed of "
-            f"{result.get('average_speed')} km/h, total moving time of {result.get('total_moving_time')} "
-            f" total idl time {result.get('total_idle_time')} and engine hours "
-            f"{result.get('engine_hours')}."
+            f"Vehicle {intent.vehicle_id} of type {result.get('vehicle_type')} belongs to group {result.get('group')} "
+            f"for time range {time_context} traveled {result.get('total_distance')} km "
+            f"with an average speed of {result.get('average_speed')} km/h, "
+            f"total moving time of {result.get('total_moving_time')}, "
+            f"total idle time {result.get('total_idle_time')} and engine hours "
+            f"{result.get('engine_hours')} and stop time {result.get('total_stop_time')}."
         )
 
     return result["message"]
@@ -250,30 +260,69 @@ def generate_response(result, intent):
 
    
     prompt = f"""
-You are a strict response formatter.
+You are a production chatbot response formatter.
 
-Your task is to rewrite the sentence ONLY for grammar and readability.
+Your job is to convert the given system-generated response into a natural, conversational reply suitable for an end user.
 
 ----------------------------------------
 INPUT:
 {base_message}
 ----------------------------------------
 
-STRICT RULES (MANDATORY):
+CRITICAL RULES (NON-NEGOTIABLE):
 
-- Output EXACTLY one sentence
-- Do NOT add any explanation
-- Do NOT include phrases like "Here is the rewritten version"
-- Do NOT add new information
-- Do NOT infer or summarize anything
+- Do NOT change any numbers, values, units, names, or facts
 - Do NOT remove any information
-- Preserve ALL values, numbers, units, and names EXACTLY
-- Preserve ALL data points present in the input
-- Only fix grammar and sentence flow
+- Do NOT add any new information
+- Do NOT infer or calculate anything
+
+- Every piece of information in INPUT must appear in OUTPUT
+
+----------------------------------------
+
+CONVERSATION STYLE RULES:
+
+- Write like a real assistant speaking to a user
+- Do NOT use section headers like:
+  "Metrics", "Time Breakdown", "Info"
+
+- Present information naturally in sentences
+- Use 2–4 short sentences (NOT bullet points)
+- Keep it smooth and easy to read
+
+- Avoid robotic chaining of commas
+- Avoid overly long sentences
+
+----------------------------------------
+
+STRUCTURE GUIDELINE:
+
+- Start with vehicle identity
+- Then mention time range if specified
+- Then summarize key metrics (distance, speed)
+- Then include time breakdown (moving, idle, engine, stop)
+
+----------------------------------------
+
+TONE:
+
+- Professional and natural
+- Slightly conversational
+- NOT overly friendly, NOT robotic
+
+----------------------------------------
+
+OUTPUT RULES:
+
+- Return ONLY the final response
+- No meta-text
+- No labels
+- No formatting like lists or sections
 
 ----------------------------------------
 
 OUTPUT:
 """
-
+    
+    
     return llm.generate(prompt)

@@ -81,3 +81,7 @@ secrets/
 
 to_add.txt
 /main_test.py
+
+/ssl
+
+fields.json

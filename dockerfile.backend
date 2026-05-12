@@ -8,7 +8,12 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . ./
+COPY app ./app
+COPY main.py .
 
-EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# COPY ssl/fullchain.pem /app/fullchain.pem
+
+# COPY ssl/privkey.pem /app/privkey.pem
+ 
+EXPOSE 5007
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5007", "--timeout-keep-alive", "3600"]

@@ -183,7 +183,8 @@ def build_alert_response(intent, api_result):
             "time": latest.get("Date"),
             "driver": latest.get("DriverName"),
             "value": latest.get("CurrentValue"),
-            "duration": latest.get("Duration")
+            "duration": latest.get("Duration"),
+            "limit": latest.get("Limit")
         }
 
     # -----------------------------
@@ -230,12 +231,14 @@ def build_alert_response(intent, api_result):
             "time": latest.get("Date"),
             "driver": latest.get("DriverName"),
             "current_value": latest.get("CurrentValue"),
-            "duration": latest.get("Duration")
+            "duration": latest.get("Duration"),
+            "limit": latest.get("Limit") 
         },
         "peak_alert": {
             "alert_name": max_event.get("AlertName") if max_event else None,
             "value": max_event.get("CurrentValue") if max_event else None,
-            "time": max_event.get("Date") if max_event else None
+            "time": max_event.get("Date") if max_event else None,
+            "limit": max_event.get("Limit") if max_event else None
         }
     }
 

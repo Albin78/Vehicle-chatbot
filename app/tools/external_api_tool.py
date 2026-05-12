@@ -240,6 +240,7 @@ def get_alertreport(
         }
 
         logger.info(f"Calling Alert list Report API {url}  for vehicleID: {id}")
+        logger.info(f"Params passed into {url}: {params}")
 
         response = requests.get(
             url,

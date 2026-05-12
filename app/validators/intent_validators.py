@@ -44,6 +44,7 @@ METRIC_SYNONYMS = {
 
     "tanker": "tanker_fuel_capacity",
     "tanker capacity": "tanker_fuel_capacity",
+    "tanker fuel capacity": "tanker_fuel_capacity",
 
     "distance": "mileage",
     "mileage": "mileage",
@@ -303,40 +304,40 @@ def detect_intent_type(query: str, clean_data: dict) -> str | None:
     q = query.lower()
 
     has_metric = clean_data.get("metric") is not None or any(
-    word in query.lower() for word in REALTIME_ALLOWED_METRICS
-)
+        word in q for word in REALTIME_ALLOWED_METRICS
+    )
     has_agg = clean_data.get("aggregation") is not None
     has_time = clean_data.get("time_range") is not None
 
     # -----------------------------
-    # ALERT (highest priority)
+    # 1. ALERT (HIGHEST PRIORITY)
     # -----------------------------
     if any(word in q for word in ["overspeed", "alert", "violation"]):
         return "alert"
 
     # -----------------------------
-    # REALTIME (explicit)
-    # -----------------------------
-    if any(word in q for word in ["current", "now", "latest", "status"]):
-        return "realtime"
-
-    # -----------------------------
-    # AGGREGATION WITHOUT TIME
-    # -----------------------------
-    if has_metric and has_agg:
-        return "historical"
-
-    # -----------------------------
-    # TIME-BASED
+    # 2. TIME-BASED → ALWAYS HISTORICAL
     # -----------------------------
     if has_time:
         return "historical"
 
     # -----------------------------
-    # PURE METRIC (AMBIGUOUS)
+    # 3. AGGREGATION → HISTORICAL
+    # -----------------------------
+    if has_metric and has_agg:
+        return "historical"
+
+    # -----------------------------
+    # 4. REALTIME (ONLY IF NO TIME)
+    # -----------------------------
+    if any(word in q for word in ["current", "now", "latest", "status"]):
+        return "realtime"
+
+    # -----------------------------
+    # 5. METRIC ONLY → REALTIME
     # -----------------------------
     if has_metric:
-        return "realtime"   
+        return "realtime"
 
     return None
 

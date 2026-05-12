@@ -3,20 +3,22 @@ services:
     build:
       context: .
       dockerfile: dockerfile.backend
+    image: vmsbotbackend:latest
     container_name: vmsbot-backend
     ports:
-      - "8000:8000"
+      - "5007:5007"
     env_file:
       - .env.development
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
 
   frontend:
     build:
       context: .
       dockerfile: dockerfile.frontend
+    image: vmsbotfrontend:latest
     container_name: vmsbot-frontend
     ports:
-      - "8501:8501"
+      - "5008:5008"
     depends_on:
       - backend
+    restart: unless-stopped

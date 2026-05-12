@@ -1,7 +1,9 @@
 import streamlit as st
 import requests
 
+# API_URL = "http://backend:5007/query"
 API_URL = "http://localhost:8000/query"
+
 
 st.set_page_config(page_title="VMS Chatbot", layout="wide")
 
