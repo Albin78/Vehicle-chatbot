@@ -1,452 +1,432 @@
 import json
 import re
+
 from app.utils.logger import logger
-from app.db.mongoclient import get_db_fields
 
 
-# DEFAULT SAFE INTENT (FALLBACK)
-# --------------------------------------------------
+# =========================================================
+# DEFAULT SAFE INTENT
+# =========================================================
+
 DEFAULT_INTENT = {
     "action": "fetch",
     "vehicle_id": None,
-    "metric": None,
+    "source": None,
+    "metrics": [],
     "aggregation": None,
-    "analysis": None,
+    "alert_analysis": None,
     "time_range": None,
-    "intent_type": None,  
-    "service": None
+    "summary_requested": False
 }
 
-REALTIME_ALLOWED_METRICS = {
+
+# =========================================================
+# METRIC CONFIG
+# =========================================================
+
+VALID_METRICS = {
+
     "speed",
-    "battery",
-    "fuel_capacity",
-    "tanker_fuel_capacity",
-    "weight",
     "mileage",
-    "fuel_level"
+    "distance_travelled",
+    "fuel_level",
+    "fuel_capacity",
+    "fuel_percentage",
+    "today_fuel_consumed",
+    "tanker_fuel_capacity",
+    "tanker_fuel_percentage",
+    "battery",
+    "ignition",
+    "engine_temperature",
+    "engine_rpm",
+    "engine_hours",
+    "location",
+    "weight",
+    "gsm_signal",
+    "wasl_identity_number",
+    "SeatbeltAttacthDisplayValue"
 }
 
 METRIC_SYNONYMS = {
-    "battery": "battery",
-    "battery level": "battery",
-    "battery status": "battery",
-    "battery voltage": "battery",
 
-    
+    "speed": "speed",
+    "current speed": "speed",
+    "vehicle speed": "speed",
+
+    "fuel": "fuel_level",
     "fuel level": "fuel_level",
-    "fuel status": "fuel_level",
-    "current fuel": "fuel_level",
     "fuel remaining": "fuel_level",
+    "current fuel": "fuel_level",
+    "fuel status": "fuel_level",
 
     "fuel capacity": "fuel_capacity",
     "tank capacity": "fuel_capacity",
 
-    "tanker": "tanker_fuel_capacity",
-    "tanker capacity": "tanker_fuel_capacity",
+    "fuel percentage": "fuel_percentage",
+
+    "today fuel consumed": "today_fuel_consumed",
+
+    "tanker fuel": "tanker_fuel_capacity",
     "tanker fuel capacity": "tanker_fuel_capacity",
 
-    "distance": "mileage",
+    "tanker fuel percentage": "tanker_fuel_percentage",
+
+   
+    "battery": "battery",
+    "battery level": "battery",
+    "battery voltage": "battery",
+
+    "ignition": "ignition",
+    "engine status": "ignition",
+
+    "engine temperature": "engine_temperature",
+
+    "engine rpm": "engine_rpm",
+    "rpm": "engine_rpm",
+
+    "engine hours": "engine_hours",
+
+    "distance": "distance_travelled",
+    "distance travelled": "distance_travelled",
+
     "mileage": "mileage",
 
-    "speed": "speed",
-    "weight": "weight"
+    "driver": "driverName",
+    "driver name": "driverName",
+
+
+    "group": "group",
+    "group name": "group",
+
+    "vehicle type": "vehicle_type",
+    "type": "vehicle_type",
+
+    "weight": "weight",
+    "load": "weight",
+
+    "satellites": "satellites",
+
+    "gsm signal": "gsm_signal",
+    "signal": "gsm_signal",
+
+    "network": "network",
+    "network type": "network",
+
+    "wasl": "wasl_identity_number",
+    "wasl identity": "wasl_identity_number",
+    "wasl identity number": "wasl_identity_number"
 }
+
+
+# =========================================================
+# VEHICLE ID
+# =========================================================
 
 VEHICLE_ID_PATTERN = re.compile(
     r"\b\d{2,5}(?:[\s\-]?[A-Z0-9]{1,3}){1,3}\b"
 )
 
-# VALID_VEHICLE_ID_PATTERN = re.compile(
-#     r"^\d{2,5}(?:[A-Z]{1,3}|\d{1,3})+$"
-# )
-
 VALID_VEHICLE_ID_PATTERN = re.compile(
     r"^\d{2,5}[A-Z]{1,3}$"
 )
 
-fields = get_db_fields()
 
-HISTORICAL_ALLOWED_METRICS = set(fields)  
-
-
-def normalize_metric(metric: str | None, query: str) -> str | None:
-    q = query.lower()
-
-    # If LLM gave something, normalize it
-    if metric:
-        metric = metric.lower().strip()
-
-        if metric in METRIC_SYNONYMS:
-            return METRIC_SYNONYMS[metric]
-
-
-        if metric == "fuel":
-            if any(word in q for word in ["level", "status", "current", "remaining"]):
-                return "fuel_level"
-            elif any(word in q for word in ["capacity", "tank"]):
-                return "fuel_capacity"
-            else:
-                return "fuel_level"  
-
-        # Try to infer from query phrases
-        for phrase, canonical in METRIC_SYNONYMS.items():
-            if phrase in q:
-                return canonical
-
-        return metric
-
-# --------------------------------------------------
-# RULE-BASED VEHICLE ID EXTRACTION (STRONG FALLBACK)
-# --------------------------------------------------
-
-def extract_vehicle_id_rule_based(query: str) -> str | None:
-    match = VEHICLE_ID_PATTERN.search(query.upper())
-    if not match:
-        return None
-
-    raw = match.group()
-    return re.sub(r"\s+", "", raw)
-
-
-def is_valid_vehicle_id(vid) -> bool:
-    if not isinstance(vid, str):
-        return False
-    return bool(VALID_VEHICLE_ID_PATTERN.match(vid))
-
-
-def resolve_vehicle_id(clean_data, query):
-    fallback_vid = extract_vehicle_id_rule_based(query)
-    llm_vid = clean_data.get("vehicle_id")
-
-    if isinstance(llm_vid, str):
-        llm_vid = re.sub(r"\s+", "", llm_vid.upper())
-
-    final_vid = None
-
-    if fallback_vid:
-        if not llm_vid:
-            final_vid = fallback_vid
-        elif not is_valid_vehicle_id(llm_vid):
-            final_vid = fallback_vid
-        elif len(fallback_vid) > len(llm_vid):
-            final_vid = fallback_vid
-        else:
-            final_vid = llm_vid
-    else:
-        final_vid = llm_vid
-
-    if final_vid and is_valid_vehicle_id(final_vid):
-        return final_vid
-
-    return None
-
-
-def extract_aggregation_rule_based(query: str) -> str | None:
-    query = query.lower()
-
-    if any(word in query for word in ["minimum", "lowest", "least", "min"]):
-        return "minimum"
-
-    if any(word in query for word in ["maximum", "highest", "top", "peak", "max"]):
-        return "maximum"
-
-    if any(word in query for word in ["average", "mean", "avg"]):
-        return "average"
-
-    return None
-
-
+# =========================================================
 # SANITIZE LLM OUTPUT
-# --------------------------------------------------
+# =========================================================
+
 def sanitize_llm_output(raw: str) -> dict:
 
     if not raw:
-        return DEFAULT_INTENT
+        return DEFAULT_INTENT.copy()
 
     try:
+
         match = re.search(r"\{[\s\S]*\}", raw)
 
         if not match:
-            logger.error(f"No JSON found in response: {raw}")
-            return DEFAULT_INTENT
+            logger.error(f"No JSON found: {raw}")
+            return DEFAULT_INTENT.copy()
 
-        json_str = match.group()
-        data = json.loads(json_str)
+        data = json.loads(match.group())
 
         if not isinstance(data, dict):
-            logger.error(f"LLM returned non-dict JSON: {data}")
-            return DEFAULT_INTENT
+            return DEFAULT_INTENT.copy()
+
+        cleaned = {}
+
+        for key in DEFAULT_INTENT.keys():
+
+            value = data.get(key)
+
+            if isinstance(value, (dict, tuple)):
+                value = None
+
+            if isinstance(value, str):
+
+                if value.strip().lower() in {
+                    "null",
+                    "none",
+                    ""
+                }:
+                    value = None
+
+            cleaned[key] = value
+
+        return cleaned
 
     except Exception as e:
-        logger.error(f"JSON parsing failed: {e}")
-        return DEFAULT_INTENT
+        logger.error(f"sanitize_llm_output failed: {e}")
 
-    clean_data = {}
-    
-    vid = clean_data.get("vehicle_id")
-
-    if vid is not None:
-        try:
-            clean_data["vehicle_id"] = str(vid)
-        except Exception:
-            logger.warning(f"Invalid vehicle_id format: {vid}")
-            clean_data["vehicle_id"] = None
-
-    for key in DEFAULT_INTENT.keys():
-        value = data.get(key, None)
-
-        # Reject invalid types
-        if isinstance(value, (dict, list)):
-            logger.warning(f"Invalid nested value for {key}: {value}")
-            value = None
-
-        # Normalize null-like strings
-        if isinstance(value, str) and value.strip().lower() in {"null", "none", ""}:
-            value = None
-
-        clean_data[key] = value
-
-    return clean_data
+        return DEFAULT_INTENT.copy()
 
 
-def is_metric_in_query(query: str, metric: str) -> bool:
-    if not metric:
-        return False
+# =========================================================
+# VEHICLE ID EXTRACTION
+# =========================================================
 
-    q = query.lower()
+def extract_vehicle_id(query: str) -> str | None:
 
-    # Check synonym phrases
-    for phrase, canonical in METRIC_SYNONYMS.items():
-        if canonical == metric and phrase in q:
-            return True
+    match = VEHICLE_ID_PATTERN.search(query.upper())
 
-    # fallback token match
-    tokens = metric.split("_")
-    return all(token in q for token in tokens)
+    if not match:
+        return None
 
+    vehicle_id = re.sub(
+        r"[\s\-]+",
+        "",
+        match.group()
+    )
 
-def extract_metric_rule_based(query: str) -> str | None:
-    q = query.lower()
-    
-    # PRIORITY MATCH (before generic)
-    if any(word in q for word in ["fuel level", "fuel status", "current fuel", "fuel remaining"]):
-        return "fuel_level"
-
-    if "fuel capacity" in q or "tank capacity" in q:
-        return "fuel_capacity"
-    
-    # First check synonyms (stronger)
-    for phrase, canonical in METRIC_SYNONYMS.items():
-        if phrase in q:
-            return canonical
-
-    # fallback to direct metrics
-    for metric in REALTIME_ALLOWED_METRICS:
-        tokens = metric.split("_")
-        if all(token in q for token in tokens):
-            return metric
+    if VALID_VEHICLE_ID_PATTERN.match(vehicle_id):
+        return vehicle_id
 
     return None
 
 
-def map_service(clean_data):
+# =========================================================
+# METRIC EXTRACTION
+# =========================================================
 
-    intent_type = clean_data.get("intent_type")
+def extract_metrics(query: str) -> list[str]:
 
-    if intent_type == "realtime":
-        clean_data["service"] = "realtime_service"
-
-    elif intent_type == "alert":
-        clean_data["service"] = "alert_service"
-
-    elif intent_type == "historical":
-        clean_data["service"] = "summary_service"
-
-    elif intent_type == "telemetry":
-        clean_data["service"] = "db_service"
-
-    else:
-        clean_data["service"] = None
-
-    return clean_data
-
-
-def validate_metric(metric, query, clean_data, fields):
-
-    if not metric:
-        return None
-
-    metric = metric.strip().lower()
-
-    intent_type = clean_data.get("intent_type")
-
-  
-    if intent_type == "realtime":
-        if metric not in REALTIME_ALLOWED_METRICS:
-            logger.warning(f"Rejected invalid realtime metric: {metric}")
-            return None
-
-    elif intent_type == "historical":
-        if metric not in fields:
-            logger.warning(f"Rejected invalid historical metric: {metric}")
-            return None
-
-    
-    if not is_metric_in_query(query, metric):
-        logger.warning(f"Rejected hallucinated metric: {metric}")
-        return None
-
-    return metric
-
-
-def detect_intent_type(query: str, clean_data: dict) -> str | None:
     q = query.lower()
 
-    has_metric = clean_data.get("metric") is not None or any(
-        word in q for word in REALTIME_ALLOWED_METRICS
-    )
-    has_agg = clean_data.get("aggregation") is not None
-    has_time = clean_data.get("time_range") is not None
+    found = set()
 
-    # -----------------------------
-    # 1. ALERT (HIGHEST PRIORITY)
-    # -----------------------------
-    if any(word in q for word in ["overspeed", "alert", "violation"]):
+    # phrase priority
+    for phrase, metric in METRIC_SYNONYMS.items():
+
+        if phrase in q:
+            found.add(metric)
+
+    # direct metrics
+    for metric in VALID_METRICS:
+
+        tokens = metric.split("_")
+
+        if all(token in q for token in tokens):
+            found.add(metric)
+
+    return list(found)
+
+
+# =========================================================
+# AGGREGATION
+# =========================================================
+
+def extract_aggregation(query: str):
+
+    q = query.lower()
+
+    if any(word in q for word in [
+        "average",
+        "avg",
+        "mean"
+    ]):
+        return "average"
+
+    if any(word in q for word in [
+        "maximum",
+        "highest",
+        "max",
+        "peak"
+    ]):
+        return "maximum"
+
+    if any(word in q for word in [
+        "minimum",
+        "lowest",
+        "min"
+    ]):
+        return "minimum"
+
+    return None
+
+
+# =========================================================
+# SOURCE DETECTION
+# =========================================================
+
+def detect_source(
+    query: str,
+    aggregation,
+    time_range
+):
+
+    q = query.lower()
+
+    # ALERT
+    if any(word in q for word in [
+        "alert",
+        "overspeed",
+        "violation"
+    ]):
         return "alert"
 
-    # -----------------------------
-    # 2. TIME-BASED → ALWAYS HISTORICAL
-    # -----------------------------
-    if has_time:
-        return "historical"
+    # SUMMARY
+    if aggregation or time_range:
+        return "summary"
 
-    # -----------------------------
-    # 3. AGGREGATION → HISTORICAL
-    # -----------------------------
-    if has_metric and has_agg:
-        return "historical"
+    # LATEST
+    if any(word in q for word in [
+        "current",
+        "latest",
+        "now",
+        "status"
+    ]):
+        return "latest"
 
-    # -----------------------------
-    # 4. REALTIME (ONLY IF NO TIME)
-    # -----------------------------
-    if any(word in q for word in ["current", "now", "latest", "status"]):
-        return "realtime"
-
-    # -----------------------------
-    # 5. METRIC ONLY → REALTIME
-    # -----------------------------
-    if has_metric:
-        return "realtime"
-
-    return None
+    # metric-only queries default latest
+    return "latest"
 
 
-# POST VALIDATION (CRITICAL LAYER)
-# --------------------------------------------------
-def post_validate(clean_data: dict, query: str, fields: list) -> dict:
+# =========================================================
+# ALERT ANALYSIS
+# =========================================================
 
-    # -----------------------------
-    # VEHICLE ID RESOLUTION (FINAL FIX)
-    # -----------------------------
-    
+def extract_alert_analysis(query: str):
+
+    q = query.lower()
+
+    if "count" in q:
+        return "count"
+
+    if "summary" in q:
+        return "summary"
+
+    return "latest"
+
+
+# =========================================================
+# CURRENT STATUS DETECTION
+# =========================================================
+
+def detect_summary_requested(query: str):
+
+    q = query.lower()
+
+    phrases = [
+        "current status",
+        "vehicle status",
+        "latest status",
+        "complete status",
+        "full status"
+    ]
+
+    return any(p in q for p in phrases)
+
+
+# =========================================================
+# FINAL POST VALIDATION
+# =========================================================
+
+def post_validate(
+    clean_data: dict,
+    query: str
+):
+
     try:
-        resolved_vid = resolve_vehicle_id(clean_data, query)
 
-        if resolved_vid:
-            if clean_data.get("vehicle_id") != resolved_vid:
-                logger.info(f"Corrected vehicle_id from {clean_data.get('vehicle_id')} → {resolved_vid}")
-            clean_data["vehicle_id"] = resolved_vid
-        else:
-            logger.warning(f"Failed to resolve vehicle_id from query: {query}")
-            clean_data["vehicle_id"] = None
-        
+        # =========================================
+        # VEHICLE
+        # =========================================
 
-        # -----------------------------
-        # METRIC FALLBACK (CRITICAL FIX)
-        # -----------------------------
-        if not clean_data.get("metric"):
-            fallback_metric = extract_metric_rule_based(query)
+        vehicle_id = extract_vehicle_id(query)
 
-            if fallback_metric:
-                logger.info(f"Recovered metric from query: {fallback_metric}")
-                clean_data["metric"] = fallback_metric
-        
+        if vehicle_id:
+            clean_data["vehicle_id"] = vehicle_id
 
-        clean_data["metric"] = normalize_metric(
-        clean_data.get("metric"),
-        query
-    )
-        
-        # METRIC VALIDATION
-        # -----------------------------
-        clean_data["metric"] = validate_metric(
-        clean_data.get("metric"),
-        query,
-        clean_data,
-        fields
-    )
+        # =========================================
+        # METRICS
+        # =========================================
 
-        # -----------------------------
-        # AGGREGATION VALIDATION
-        # -----------------------------
-        if clean_data.get("aggregation") and not clean_data.get("metric"):
-            clean_data["aggregation"] = None
+        extracted_metrics = extract_metrics(query)
 
-        if clean_data.get("metric"):  # only if metric exists
-            rule_based_agg = extract_aggregation_rule_based(query)
+        valid_metrics = []
 
-            if rule_based_agg:
-                if clean_data.get("aggregation") != rule_based_agg:
-                    logger.warning(
-                        f"Corrected aggregation from {clean_data.get('aggregation')} → {rule_based_agg}"
-                    )
-                clean_data["aggregation"] = rule_based_agg
-    
+        for metric in extracted_metrics:
 
-        # INTENT TYPE DETECTION (CRITICAL)
-        # -----------------------------
-        rule_intent = detect_intent_type(query, clean_data)
-        llm_intent = clean_data.get("intent_type")
+            metric = metric.lower().strip()
 
-        if rule_intent:
-            if llm_intent != rule_intent:
-                logger.warning(
-                    f"Corrected intent_type from {llm_intent} → {rule_intent}"
-                )
-            clean_data["intent_type"] = rule_intent
-        else:
-            clean_data["intent_type"] = llm_intent
+            if metric in VALID_METRICS:
+                valid_metrics.append(metric)
 
+        clean_data["metrics"] = list(set(valid_metrics))
 
-        # TIME RANGE NORMALIZATION
-        # -----------------------------
-        tr = clean_data.get("time_range")
+        # =========================================
+        # AGGREGATION
+        # =========================================
 
-        if isinstance(tr, str):
-            tr = tr.lower().strip()
+        aggregation = extract_aggregation(query)
 
-            # Normalize patterns
-            tr = re.sub(r"between (.+?) and (.+)", r"\1 to \2", tr)
-            tr = re.sub(r"from (.+?) to (.+)", r"\1 to \2", tr)
-            tr = re.sub(r"(\w+ \d+)-(\d+)", r"\1 to \2", tr)
+        clean_data["aggregation"] = aggregation
 
-            clean_data["time_range"] = tr
+        # =========================================
+        # SOURCE
+        # =========================================
+
+        source = detect_source(
+            query=query,
+            aggregation=clean_data.get("aggregation"),
+            time_range=clean_data.get("time_range")
+        )
+
+        clean_data["source"] = source
+
+        # =========================================
+        # ALERT ANALYSIS
+        # =========================================
+
+        if source == "alert":
+
+            clean_data["alert_analysis"] = (
+                extract_alert_analysis(query)
+            )
+
+        # =========================================
+        # SUMMARY REQUESTED
+        # =========================================
+
+        clean_data["summary_requested"] = (
+            detect_summary_requested(query)
+        )
+
+        # =========================================
+        # RULE:
+        # current status => all latest fields
+        # =========================================
+
+        if clean_data["summary_requested"]:
+            clean_data["metrics"] = []
 
         return clean_data
-    
+
     except Exception as e:
-        logger.error(f"[POST_VALIDATE ERROR] {e}", exc_info=True)
 
-        return {
-            "action": "fetch",
-            "vehicle_id": None,
-            "metric": None,
-            "aggregation": None,
-            "analysis": None,
-            "time_range": None,
-            "intent_type": None,
-            "service": None,
-            "error": "Intent processing failed. Please try again."
-        }
+        logger.error(
+            f"post_validate failed: {e}",
+            exc_info=True
+        )
 
+        return DEFAULT_INTENT.copy()

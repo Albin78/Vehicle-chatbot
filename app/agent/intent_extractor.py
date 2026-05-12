@@ -1,133 +1,238 @@
 from app.llm.ollama_client import OllamaClient
-from app.db.mongoclient import get_db_fields
 from app.schemas.intent_schema import QueryIntent
 from app.utils.logger import logger
-from app.validators.intent_validators import sanitize_llm_output, post_validate, map_service
+
+from app.validators.intent_validators import (
+    sanitize_llm_output,
+    post_validate
+)
+
 from app.parsers.date_parser import extract_time_range
+
 
 llm = OllamaClient()
 
 
-# --------------------------------------------------
-# DEFAULT SAFE INTENT (FALLBACK)
-# --------------------------------------------------
+# =========================================================
+# DEFAULT FALLBACK
+# =========================================================
+
 DEFAULT_INTENT = {
     "action": "fetch",
     "vehicle_id": None,
-    "metric": None,
+    "source": None,
+    "metrics": [],
     "aggregation": None,
-    "analysis": None,
+    "alert_analysis": None,
     "time_range": None,
-    "intent_type": None,  
-    "service": None
+    "summary_requested": False
 }
 
 
+# =========================================================
 # INTENT EXTRACTION
+# =========================================================
+
 def extract_intent(query: str) -> QueryIntent:
 
-    fields = get_db_fields()
+    # -----------------------------------------------------
+    # EXTRACT TIME RANGE FIRST
+    # -----------------------------------------------------
+
+    parsed_time_range = extract_time_range(query)
+
+    # -----------------------------------------------------
+    # LLM PROMPT
+    # -----------------------------------------------------
 
     prompt = f"""
 You are an expert intent classifier for a Vehicle Monitoring System.
 
-Return ONLY ONE valid JSON.
+Return ONLY valid JSON.
+Do NOT explain anything.
 
-----------------------------------------
-STEP 1: RELEVANCE CHECK
+=========================================================
+SUPPORTED SOURCES
+=========================================================
 
-If NOT vehicle-related → return all null
+1. latest
+   - current data
+   - latest status
+   - live vehicle information
 
-----------------------------------------
-STEP 2: INTENT CLASSIFICATION (CRITICAL)
+2. summary
+   - historical analytics
+   - aggregated metrics
+   - date-range operations
 
-Classify query into ONE of:
+3. alert
+   - overspeed
+   - violations
+   - alert history
 
-1. "realtime"  
-   → current / latest / now / status  
-   → NO time_range required  
+=========================================================
+SUPPORTED METRICS
+=========================================================
 
-2. "historical"  
-   → contains time range  
-   → analytics / summary  
+speed
+fuel_level
+fuel_capacity
+battery
+weight
+mileage
+temperature
+ignition
+battery_voltage
+engine_temperature
+engine_rpm
+fuel_percentage
+tanker_fuel_percentage
+door_status
+seatbelt_status
+engine_hours
+idle_time
+distance
+fuel_consumed
+wasl_identity_number
 
-3. "alert"  
-   → contains words like:
-     "overspeed", "alerts", "violations"
+=========================================================
+RULES
+=========================================================
 
-4. "telemetry"  
-   → raw metric without time range  
-   → from DB
+1. If query asks:
+   - current
+   - latest
+   - now
+   - status
 
-----------------------------------------
-STEP 3: FIELD EXTRACTION
+THEN:
+source = "latest"
 
-Extract:
-- vehicle_id
-- metric (ONLY if exact word exists)
-- aggregation (ONLY if explicitly present)
-- time_range (ONLY if explicitly present)
+---------------------------------------------------------
 
-----------------------------------------
-STRICT OUTPUT FORMAT:
+2. If query contains:
+   - time range
+   - average
+   - minimum
+   - maximum
+   - summary
+   - report
+
+THEN:
+source = "summary"
+
+---------------------------------------------------------
+
+3. If query contains:
+   - alert
+   - overspeed
+   - violation
+   - idling
+
+THEN:
+source = "alert"
+
+---------------------------------------------------------
+
+4. Extract ONLY metrics explicitly mentioned.
+
+5. metrics MUST be ARRAY.
+
+6. aggregation allowed:
+- minimum
+- maximum
+- average
+
+7. alert_analysis allowed:
+- latest
+- count
+- summary
+
+8. summary_requested = true
+ONLY if query asks:
+- full status
+- complete status
+- current status
+- latest status
+
+=========================================================
+STRICT OUTPUT FORMAT
+=========================================================
 
 {{
-  "action": "fetch | update | delete",
+  "action": "fetch",
   "vehicle_id": string | null,
-  "metric": string | null,
+  "source": "latest" | "summary" | "alert" | null,
+  "metrics": [],
   "aggregation": "minimum" | "maximum" | "average" | null,
-  "analysis": string | null,
-  "time_range": string | null,
-  "intent_type": "realtime | historical | alert | telemetry | null",
-  "service": null
+  "alert_analysis": "latest" | "count" | "summary" | null,
+  "time_range": null,
+  "summary_requested": true | false
 }}
 
-----------------------------------------
-RULES:
+=========================================================
+INPUT
 
-- DO NOT guess
-- DO NOT infer metric
-- DO NOT add fields
-- DO NOT explain
-
-----------------------------------------
-INPUT:
 {query}
 
-----------------------------------------
-OUTPUT:
+OUTPUT
+=========================================================
+
 JSON only
 """
 
-    raw_response = llm.generate(prompt,)
+    # -----------------------------------------------------
+    # LLM GENERATION
+    # -----------------------------------------------------
+
+    raw_response = llm.generate(prompt)
 
     logger.info(f"Raw LLM Response: {raw_response}")
 
-    # -----------------------------
-    # SANITIZE OUTPUT
-    # -----------------------------
+    # -----------------------------------------------------
+    # SANITIZE
+    # -----------------------------------------------------
+
     clean_data = sanitize_llm_output(raw_response)
-    clean_data = post_validate(clean_data, query, fields)
-    clean_data = map_service(clean_data)
 
-    logger.info(f"After post validation JSON: {clean_data}")
-    
-    time_range = extract_time_range(query)
+    logger.info(f"Sanitized Intent: {clean_data}")
 
-    if time_range:
-        clean_data["time_range"] = time_range
-    else:
-        clean_data["time_range"] = None
-    # -----------------------------
-    # FINAL INTENT OBJECT
-    # -----------------------------
+    # -----------------------------------------------------
+    # TIME RANGE INJECTION
+    # -----------------------------------------------------
+
+    if parsed_time_range:
+        clean_data["time_range"] = parsed_time_range
+
+    # -----------------------------------------------------
+    # POST VALIDATION
+    # -----------------------------------------------------
+
+    clean_data = post_validate(
+        clean_data=clean_data,
+        query=query
+    )
+
+    logger.info(f"Post Validated Intent: {clean_data}")
+
     try:
+
         intent = QueryIntent(**clean_data)
+
     except Exception as e:
-        logger.error(f"Pydantic validation failed: {e}")
+
+        logger.error(
+            f"Pydantic validation failed: {e}",
+            exc_info=True
+        )
+
         intent = QueryIntent(**DEFAULT_INTENT)
 
-    logger.info(f"Final Intent: {intent}")
-    logger.info(f"Type of intent: {type(intent)}")
+    # -----------------------------------------------------
+    # FINAL LOGGING
+    # -----------------------------------------------------
+
+    logger.info(f"Final Intent Object: {intent}")
+    logger.info(f"Intent Type: {type(intent)}")
 
     return intent

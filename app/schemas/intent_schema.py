@@ -8,36 +8,21 @@ from pydantic import field_validator
 from pydantic import model_validator
 
 
-VALID_SOURCES = {
-    "latest",
-    "summary",
-    "alert"
-}
-
-VALID_ALERT_ANALYSIS = {
-    "latest",
-    "count",
-    "summary"
-}
-
-VALID_AGGREGATIONS = {
-    "minimum",
-    "maximum",
-    "average"
-}
-
-
 class QueryIntent(BaseModel):
 
     # ---------------------------------
     # BASIC
     # ---------------------------------
-    action: Literal["fetch", "update", "delete"] = "fetch"
+    action: Literal[
+        "fetch",
+        "update",
+        "delete"
+    ] = "fetch"
 
     vehicle_id: Optional[str] = None
 
     # ---------------------------------
-    # PAYLOAD SOURCE
+    # BACKEND PAYLOAD SOURCE
     # ---------------------------------
     source: Optional[
         Literal[
@@ -48,12 +33,12 @@ class QueryIntent(BaseModel):
     ] = None
 
     # ---------------------------------
-    # MULTI-METRIC SUPPORT
+    # MULTI METRIC SUPPORT
     # ---------------------------------
     metrics: list[str] = []
 
     # ---------------------------------
-    # ANALYTICS
+    # SUMMARY / ANALYTICS
     # ---------------------------------
     aggregation: Optional[
         Literal[
@@ -110,6 +95,7 @@ class QueryIntent(BaseModel):
     def normalize_vehicle_id(cls, v):
 
         if isinstance(v, str):
+
             return re.sub(
                 r"\s+",
                 "",
@@ -119,7 +105,7 @@ class QueryIntent(BaseModel):
         return v
 
     # ==========================================
-    # METRICS NORMALIZATION
+    # METRIC NORMALIZATION
     # ==========================================
     @field_validator("metrics", mode="before")
     @classmethod
@@ -157,21 +143,15 @@ class QueryIntent(BaseModel):
     @model_validator(mode="after")
     def validate_business_rules(self):
 
-        # ---------------------------------
         # Aggregation requires metrics
-        # ---------------------------------
         if self.aggregation and not self.metrics:
             self.aggregation = None
 
-        # ---------------------------------
         # Alert analysis only for alerts
-        # ---------------------------------
         if self.source != "alert":
             self.alert_analysis = None
 
-        # ---------------------------------
         # summary_requested only for latest
-        # ---------------------------------
         if self.source != "latest":
             self.summary_requested = False
 
