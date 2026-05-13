@@ -2,6 +2,7 @@ from app.llm.ollama_client import OllamaClient
 from app.parsers.date_parser import format_time_generate
 from app.utils.logger import logger
 import re
+from app.response_generator.formatt_router import build_user_message
 
 
 llm = OllamaClient()
@@ -41,7 +42,7 @@ def metric_not_available_response(metric: str, vehicle: str) -> str:
     )
 
 
-def build_user_message(result, intent):
+def build_user_messages(result, intent):
 
     if not result or "error" in result:
         return result.get("error", "I couldn't find any data for the given vehicle.")
