@@ -10,9 +10,6 @@ from pydantic import model_validator
 
 class QueryIntent(BaseModel):
 
-    # ---------------------------------
-    # BASIC
-    # ---------------------------------
     action: Literal[
         "fetch",
         "update",
@@ -21,9 +18,6 @@ class QueryIntent(BaseModel):
 
     vehicle_id: Optional[str] = None
 
-    # ---------------------------------
-    # BACKEND PAYLOAD SOURCE
-    # ---------------------------------
     source: Optional[
         Literal[
             "latest",
@@ -32,14 +26,8 @@ class QueryIntent(BaseModel):
         ]
     ] = None
 
-    # ---------------------------------
-    # MULTI METRIC SUPPORT
-    # ---------------------------------
     metrics: list[str] = []
 
-    # ---------------------------------
-    # SUMMARY / ANALYTICS
-    # ---------------------------------
     aggregation: Optional[
         Literal[
             "minimum",
@@ -59,15 +47,11 @@ class QueryIntent(BaseModel):
         ]
     ] = None
 
-    # ---------------------------------
-    # TIME RANGE
-    # ---------------------------------
     time_range: Optional[tuple[str, str]] = None
 
-    # ---------------------------------
-    # CURRENT STATUS REQUEST
-    # ---------------------------------
-    summary_requested: bool = False
+    summary_requested: bool = False 
+
+
 
     # ==========================================
     # CLEAN NULL STRINGS

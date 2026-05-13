@@ -85,13 +85,13 @@ def get_vehicle_details(company_id: Optional[int]=16):
 
 
 def combined_report(
-    vid: int | None,
+    vehicle_id: int | None,
     company_id: int | None,
     from_date: datetime | None,
     to_date: datetime | None
 ):
     try:
-        if not id:
+        if not vehicle_id:
             return {"response": "ID is required"}
 
         headers = {
@@ -103,20 +103,21 @@ def combined_report(
         url = "https://api.girfalco.sa/v2/report/combinedVehicleReport"
 
         params = {
-            "vehicleID": vid,
+            "vid": vehicle_id,
             "fromDate": from_date,
             "toDate": to_date,
             "cid": company_id,
         }
 
-        logger.info(f"Calling Operation Summary API for vehicleID: {id}")
+        logger.info(f"Calling Combined Report API for vehicleID: {vehicle_id}")
 
         response = requests.get(
             url,
             headers=headers,
             params=params,
             timeout=10
-        )
+        ) 
+        logger.info(f"Response from combined report API: {response}")
 
         logger.info(f"Status Code: {response.status_code}")
 

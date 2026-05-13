@@ -1,6 +1,7 @@
 from typing import  Any
 from app.utils.logger import logger
-from typing_extensions import Any
+from typing import Any
+
 
 def validate_result(result):
 
@@ -17,24 +18,81 @@ def validate_result(result):
     }
     
 
-def validate_api_response(api_response: dict[str, Any] | None) -> dict[str, Any]:
-    if not api_response:
+
+def validate_api_response(
+    api_response: dict[str, Any] | None
+) -> dict[str, Any]:
+
+    logger.info("[VALIDATOR] Validating API response")
+
+    # -------------------------------------------------
+    # NULL RESPONSE
+    # -------------------------------------------------
+
+    if api_response is None:
+
         return {
             "type": "error",
-            "message": "Invalid IMEI for this company"
+            "message": "API returned no response"
         }
+
+    # -------------------------------------------------
+    # INVALID TYPE
+    # -------------------------------------------------
+
+    if not isinstance(api_response, dict):
+
+        return {
+            "type": "error",
+            "message": "Invalid API response structure"
+        }
+
+    # -------------------------------------------------
+    # EMPTY RESPONSE
+    # -------------------------------------------------
+
+    if not api_response:
+
+        return {
+            "type": "error",
+            "message": "No vehicle data found"
+        }
+
+    # -------------------------------------------------
+    # API FAILURE
+    # -------------------------------------------------
+
+    if api_response.get("status") == "failed":
+
+        return {
+            "type": "error",
+            "message": api_response.get(
+                "message",
+                "External API failed"
+            )
+        }
+
+    # -------------------------------------------------
+    # SUCCESS
+    # -------------------------------------------------
+
     return {
-        "type": "vehicle_data",
+        "type": "success",
         "data": api_response
     }
 
 
 def validate_action(intent) -> dict[str, Any]:
+
+    
+    # VALID ACTION
+    # -----------------------------------------
+
     if intent.action != "fetch":
-        logger.info("Inside the validate action function")
+
         return {
             "type": "error",
-            "message": "This action is not permitted"
+            "message": "Unsupported action"
         }
     
     return {
@@ -45,35 +103,56 @@ def validate_action(intent) -> dict[str, Any]:
 
 def validate_intent(intent):
 
-    is_realtime = intent.intent_type == "realtime"
-    is_historical = intent.intent_type == "historical"
-    is_alert = intent.intent_type == "alert"
-    is_telemetry = intent.metric is not None
+    valid_sources = {
+        "latest",
+        "summary",
+        "alert"
+    }
 
-    have_timerange = intent.time_range is not None
+    if intent.source not in valid_sources:
 
-    # -----------------------------
-    # INVALID DOMAIN
-    # -----------------------------
-    if intent.action == "fetch" and not (
-        is_telemetry or is_realtime or is_historical or is_alert
-    ):
         return {
             "type": "error",
-            "message": "I am VMS Chatbot. I can't answer to these questions."
+            "message": "Invalid source detected"
         }
 
-    # -----------------------------
-    # TIME VALIDATION
-    # -----------------------------
-    if is_historical and not have_timerange:
+    if not intent.vehicle_id:
+
         return {
             "type": "error",
-            "message": "Time range is required for historical queries."
+            "message": "Vehicle ID missing"
         }
 
-    # realtime → no time needed ✅
-    # alert → optional (handled in router) ✅
+
+    if intent.source == "summary":
+
+        if not intent.time_range:
+
+            return {
+                "type": "error",
+                "message": "Time range required for summary queries"
+            }
+
+
+    if intent.source == "alert":
+
+        if not intent.time_range:
+
+            return {
+                "type": "error",
+                "message": "Time range required for alert queries"
+            }
+
+
+    if intent.source == "latest":
+
+
+        if intent.aggregation:
+
+            return {
+                "type": "error",
+                "message": "Aggregation not allowed for realtime queries"
+            }
 
     return {
         "type": "success",

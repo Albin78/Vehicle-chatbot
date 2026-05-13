@@ -1,16 +1,21 @@
 from pydantic import BaseModel
-from typing_extensions import Optional
+from typing import Optional
+
 
 class ExecutionPlan(BaseModel):
 
     tool: str
 
-    operation: str
+    operation: Optional[str] = None
 
-    metric: str 
+    metrics: list[str] = []
 
-    imei: str | None
+    aggregation: Optional[str] = None
 
-    vehicle_id: str | None
+    alert_analysis: Optional[str] = None
 
-    time_range: Optional[tuple[str, str]]
+    imei: Optional[str] = None
+
+    vehicle_id: Optional[str] = None
+
+    time_range: Optional[tuple[str, str]] = None
