@@ -18,7 +18,8 @@ REALTIME_METRIC_MAP = {
     "make": "makeName",
     "wasl": "WaslIdentityNumber",
     "fuel_consumed_today": "todayFuelConsumed",
-    "seatbelt": "seatBelt"
+    "seatbelt": "seatBelt",
+    "tanker_fuel_capacity": "TankerfuelCapacity"
 }
 
 

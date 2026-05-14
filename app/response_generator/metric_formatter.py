@@ -104,8 +104,23 @@ def interpret_metric_value(metric, value):
                 f"ignition status is {value}"
             )
         }
+    
+    
+    # if metric == "tanker_fuel_capacity":
 
+    #     ignition_map = {
+    #         0: "ignition is off",
+    #         1: "ignition is on"
+    #     }
 
+    #     return {
+    #         "available": True,
+    #         "text": ignition_map.get(
+    #             int(value),
+    #             f"ignition status is {value}"
+    #         )
+    #     }
+    
     unit = get_unit(metric)
 
     readable_metric = metric.replace("_", " ")
