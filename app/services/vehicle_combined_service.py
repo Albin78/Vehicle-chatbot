@@ -10,7 +10,7 @@ from app.validators.result_validator import (
     validate_api_response
 )
 
-from app.validators.external_api_formatter import (
+from app.builders.response_route import (
     build_response
 )
 

@@ -43,8 +43,12 @@ VALID_METRICS = {
     "location",
     "weight",
     "gsm_signal",
-    "wasl_identity_number",
-    "SeatbeltAttacthDisplayValue"
+    "wasl",
+    "seatbelt",
+    "door_open",
+    "vehicle_type",
+    "make",
+    "imei"
 }
 
 METRIC_SYNONYMS = {
@@ -75,6 +79,10 @@ METRIC_SYNONYMS = {
     "battery": "battery",
     "battery level": "battery",
     "battery voltage": "battery",
+    
+    "seatbelt": "seatbelt",
+    "seat belt": "seatbelt",
+    "seatbelt status": "seatbelt",
 
     "ignition": "ignition",
     "engine status": "ignition",
@@ -185,20 +193,26 @@ def sanitize_llm_output(raw: str) -> dict:
 # VEHICLE ID EXTRACTION
 # =========================================================
 
-def extract_vehicle_id(query: str) -> str | None:
+def extract_vehicle_id(query: str):
 
-    match = VEHICLE_ID_PATTERN.search(query.upper())
+    match = VEHICLE_ID_PATTERN.search(
+        query.upper()
+    )
 
     if not match:
         return None
 
-    vehicle_id = re.sub(
+    # Preserve original readable format
+    vehicle_id = match.group().strip()
+
+    # Validate using normalized version
+    normalized = re.sub(
         r"[\s\-]+",
         "",
-        match.group()
+        vehicle_id
     )
 
-    if VALID_VEHICLE_ID_PATTERN.match(vehicle_id):
+    if VALID_VEHICLE_ID_PATTERN.match(normalized):
         return vehicle_id
 
     return None

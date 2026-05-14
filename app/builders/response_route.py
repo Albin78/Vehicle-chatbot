@@ -13,7 +13,7 @@ from app.builders.summary_builder import (
 
 def build_response(intent, api_result):
 
-    if intent.source == "realtime":
+    if intent.source == "latest":
 
         return build_realtime_response(
             intent,

@@ -127,8 +127,8 @@ def combined_report(
 
         data = response.json()
 
-        if not data.get("dataRows"):
-            return {"response": "No data available for this vehicle"}
+        # if not data.get("dataRows"):
+        #     return {"response": "No data available for this vehicle"}
 
         return data
 

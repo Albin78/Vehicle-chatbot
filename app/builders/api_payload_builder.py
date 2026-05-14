@@ -1,3 +1,14 @@
+from datetime import datetime, timezone
+
+
+def get_today_date():
+
+    return datetime.now(
+        timezone.utc
+    ).strftime("%Y-%m-%d")
+
+
+
 def build_combined_payload(
     intent,
     plan,
@@ -13,21 +24,23 @@ def build_combined_payload(
     }
 
     # --------------------------------------------------
-    # SUMMARY
+    # SUMMARY / ALERT WITH RANGE
     # --------------------------------------------------
 
-    if intent.source == "summary":
+    if intent.source in ["summary", "alert"]:
 
         payload["from_date"] = plan.time_range[0]
         payload["to_date"] = plan.time_range[1]
 
     # --------------------------------------------------
-    # ALERT
+    # LATEST / CURRENT STATUS
     # --------------------------------------------------
 
-    elif intent.source == "alert":
+    elif intent.source in ["latest", "realtime"]:
 
-        payload["from_date"] = plan.time_range[0]
-        payload["to_date"] = plan.time_range[1]
+        today = get_today_date()
+
+        payload["from_date"] = today
+        payload["to_date"] = today
 
     return payload

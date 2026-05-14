@@ -1,6 +1,7 @@
 # vehicle_cache.py
 
 import time
+import re
 
 from app.tools.external_api_tool import get_vehicle_details
 from app.utils.logger import logger
@@ -24,7 +25,7 @@ GLOBAL_CACHE = {
 CACHE_TTL = {
 
     # Vehicle metadata changes rarely
-    "vehicle_list": 1200,
+    "vehicle_list": 600,
 
     # Alerts can tolerate small delay
     "alerts": 120,
@@ -38,12 +39,18 @@ CACHE_TTL = {
 # NORMALIZATION
 # =========================================================
 
-def normalize_vehicle_id(v_id: str) -> str:
+
+
+def normalize_vehicle_id(v_id: str):
 
     if not v_id:
         return ""
 
-    return "".join(v_id.split()).upper()
+    return re.sub(
+        r"[^A-Z0-9]",
+        "",
+        v_id.upper()
+    )
 
 
 # =========================================================
@@ -119,7 +126,14 @@ def vehicle_key_builder(vehicle):
     if not plate:
         return None
 
-    return normalize_vehicle_id(plate)
+    normalized = normalize_vehicle_id(plate)
+
+    logger.info(
+        f"Cache indexed vehicle: "
+        f"{plate} -> {normalized}"
+    )
+
+    return normalized
 
 
 # =========================================================

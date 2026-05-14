@@ -186,7 +186,8 @@ JSON only
     # -----------------------------------------------------
 
     raw_response = llm.generate(prompt)
-
+    
+    logger.info(f"Query input: {query}")
     logger.info(f"Raw LLM Response: {raw_response}")
 
     # -----------------------------------------------------

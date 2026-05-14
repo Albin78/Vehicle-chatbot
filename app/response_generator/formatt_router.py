@@ -3,12 +3,14 @@
 from app.response_generator.realtime_formatter import format_realtime
 from app.response_generator.alert_formatter import format_alert
 from app.response_generator.summary_formatter import format_summary
-# from app.response_generator.metric_formatter import format_metric
+from app.utils.logger import logger
+
 
 
 def build_user_message(result, intent):
 
     result_type = result.get("type")
+    logger.info(f"Result type: {result_type}")
 
     if result_type in [
         "realtime_status",

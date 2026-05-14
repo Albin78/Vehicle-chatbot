@@ -1,5 +1,7 @@
 from app.tools.vehicle_resolver import normalize_vehicle_id
+from app.utils.value_cleaner import clean_value
 from app.utils.response_utils import error_response
+from app.utils.logger import logger
 
 
 REALTIME_METRIC_MAP = {
@@ -9,15 +11,15 @@ REALTIME_METRIC_MAP = {
     "battery": "batteryLevel",
     "fuel_level": "fuelLevel",
     "mileage": "mileage",
-    "SeatbeltAttacthDisplayValue": "Seatbelt",
-    "doorOpen": "DoorOpen",
-    "IMEI": "imei",
-    "typeName": "type",
-    "makeName": "Model",
-    "WaslIdentityNumber": "Wasl",
-    "todayFuelConsumed": "fuelconsumed_today"
+    "seatbelt": "seatBelt",
+    "door_open": "doorOpen",
+    "imei": "IMEI",
+    "vehicle_type": "typeName",
+    "make": "makeName",
+    "wasl": "WaslIdentityNumber",
+    "fuel_consumed_today": "todayFuelConsumed",
+    "seatbelt": "seatBelt"
 }
-
 
 
 def filter_vehicle(records, vehicle_id):
@@ -50,8 +52,7 @@ def derive_vehicle_status(vehicle):
     if vstatus in vstatus_map:
         return vstatus_map[vstatus]
 
-    speed = vehicle.get("speed", 0)
-    ignition = vehicle.get("ignitionOn", 0)
+    speed = float(vehicle.get("speed", 0) or 0)
 
     if speed > 0:
         return "Moving"
@@ -60,57 +61,135 @@ def derive_vehicle_status(vehicle):
 
 
 
-def build_metric_response(vehicle, metric):
+def build_metric_response(vehicle, metrics):
 
-    if metric not in REALTIME_METRIC_MAP:
+    logger.info(
+        f"Metrics input to realtime metric builder: {metrics}"
+    )
 
+    if not metrics:
         return error_response(
-            f"Unsupported realtime metric: {metric}"
+            "No realtime metrics requested"
         )
 
-    field = REALTIME_METRIC_MAP[metric]
+    metric_values = {}
+    invalid_metrics = []
+
+    for metric in metrics:
+
+        metric = metric.lower()
+
+        if metric not in REALTIME_METRIC_MAP:
+            invalid_metrics.append(metric)
+            continue
+
+        field = REALTIME_METRIC_MAP[metric]
+
+        value = vehicle.get(field)
+
+        metric_values[metric] = value
+
+    if not metric_values:
+
+        return error_response(
+            "No valid realtime metrics found"
+        )
 
     return {
+
+        "type": "realtime_metric",
+
         "vehicle": vehicle.get("numberPlate"),
-        "metric": metric,
-        "value": vehicle.get(field),
-        "last_updated": vehicle.get("lastUpdated")
+
+        "metrics": metric_values,
+
+        "invalid_metrics": invalid_metrics,
+
+        "last_updated":
+            vehicle.get("lastUpdatedTime")
     }
+
 
 
 def build_status_response(vehicle):
 
     return {
 
-        "vehicle": vehicle.get("numberPlate"),
+        "type": "realtime_status",
+
+        "vehicle": clean_value(
+            vehicle.get("numberPlate")
+        ),
 
         "status": derive_vehicle_status(vehicle),
 
-        "speed": vehicle.get("speed"),
+        "speed": clean_value(
+            vehicle.get("speed")
+        ),
 
-        "battery": vehicle.get("batteryLevel"),
+        "battery": clean_value(
+            vehicle.get("batteryLevel")
+        ),
 
-        "fuel_level": vehicle.get("fuelLevel"),
+        "fuel_level": clean_value(
+            vehicle.get("fuelLevel")
+        ),
 
-        "fuel_capacity": vehicle.get("fuelCapacity"),
+        "fuel_capacity": clean_value(
+            vehicle.get("fuelCapacity")
+        ),
 
-        "driver": vehicle.get("driverName"),
+        "driver": clean_value(
+            vehicle.get("driverName")
+        ),
 
-        "location": vehicle.get("Location"),
+        "location": clean_value(
+            vehicle.get("Location")
+        ),
 
-        "last_updated": vehicle.get("lastUpdatedTime"),
+        "last_updated": clean_value(
+            vehicle.get("lastUpdatedTime")
+        ),
 
-        "tankerfuelcapacity": vehicle.get("TankerfuelCapacity"),
+        "tankerfuelcapacity": clean_value(
+            vehicle.get("TankerfuelCapacity")
+        ),
 
-        "fuelpercentage": vehicle.get("fuelPercentage"),
+        "fuelpercentage": clean_value(
+            vehicle.get("fuelPercentage")
+        ),
 
-        "weight": vehicle.get("Weight"),
+        "weight": clean_value(
+            vehicle.get("Weight")
+        ),
 
-        "Wasl": vehicle.get("WaslIdentityNumber"),
+        "wasl": clean_value(
+            vehicle.get("WaslIdentityNumber")
+        ),
 
-        "fuelconsumed_today": vehicle.get("todayFuelConsumed"),
+        "fuelconsumed_today": clean_value(
+            vehicle.get("todayFuelConsumed")
+        ),
 
-        "imei": vehicle.get("IMEI")
+        "imei": clean_value(
+            vehicle.get("IMEI")
+        ),
+
+        "seatbelt": clean_value(
+            vehicle.get("seatBelt")
+        ),
+
+        "door_status": clean_value(
+            vehicle.get("doorOpen")
+        ),
+
+        "vehicle_type": clean_value(
+            vehicle.get("typeName")
+        ),
+
+        "make": clean_value(
+            vehicle.get("makeName")
+        )
     }
 
 
@@ -139,10 +218,11 @@ def build_realtime_response(intent, api_result):
             "Vehicle realtime data not found"
         )
 
-    if intent.metric:
+    if intent.metrics:
+
         return build_metric_response(
             vehicle,
-            intent.metric
+            intent.metrics
         )
 
     return build_status_response(vehicle)
