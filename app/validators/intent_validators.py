@@ -319,22 +319,74 @@ def detect_source(
 # ALERT ANALYSIS
 # =========================================================
 
-def extract_alert_analysis(query: str):
+def extract_alert_response_type(query: str):
 
     q = query.lower()
 
-    if "count" in q:
-        return "count"
+    count_phrases = [
 
-    if "summary" in q:
-        return "summary"
+        "count",
+        "how many",
+        "number of alerts",
+        "total alerts",
+        "alerts count"
+    ]
 
-    return "latest"
+    if any(phrase in q for phrase in count_phrases):
+
+        return "alert_count"
 
 
-# =========================================================
-# CURRENT STATUS DETECTION
-# =========================================================
+    distribution_phrases = [
+
+        "distribution",
+        "breakdown",
+        "types of alerts",
+        "alert types"
+    ]
+
+    if any(phrase in q for phrase in distribution_phrases):
+
+        return "alert_distribution"
+
+    latest_phrases = [
+
+        "latest alert",
+        "recent alert",
+        "last alert"
+    ]
+
+    if any(phrase in q for phrase in latest_phrases):
+
+        return "latest_alert"
+
+    overspeed_phrases = [
+
+        "highest speed",
+        "maximum speed",
+        "overspeed details",
+        "max overspeed"
+    ]
+
+    if any(phrase in q for phrase in overspeed_phrases):
+
+        return "overspeed_summary"
+
+    daily_phrases = [
+
+        "daily alerts",
+        "alerts per day",
+        "daily breakdown",
+        "alert trend"
+    ]
+
+    if any(phrase in q for phrase in daily_phrases):
+
+        return "daily_alert_summary"
+
+    return "full_alert_summary"
+
+
 
 def detect_summary_requested(query: str):
 
@@ -362,18 +414,10 @@ def post_validate(
 
     try:
 
-        # =========================================
-        # VEHICLE
-        # =========================================
-
         vehicle_id = extract_vehicle_id(query)
 
         if vehicle_id:
             clean_data["vehicle_id"] = vehicle_id
-
-        # =========================================
-        # METRICS
-        # =========================================
 
         extracted_metrics = extract_metrics(query)
 
@@ -388,17 +432,10 @@ def post_validate(
 
         clean_data["metrics"] = list(set(valid_metrics))
 
-        # =========================================
-        # AGGREGATION
-        # =========================================
 
         aggregation = extract_aggregation(query)
 
         clean_data["aggregation"] = aggregation
-
-        # =========================================
-        # SOURCE
-        # =========================================
 
         source = detect_source(
             query=query,
@@ -408,14 +445,11 @@ def post_validate(
 
         clean_data["source"] = source
 
-        # =========================================
-        # ALERT ANALYSIS
-        # =========================================
 
         if source == "alert":
 
-            clean_data["alert_analysis"] = (
-                extract_alert_analysis(query)
+            clean_data["alert_response_type"] = (
+                extract_alert_response_type(query)
             )
 
         # =========================================

@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime
 import re
 
@@ -13,24 +13,29 @@ def parse_alert_date(date_str: str):
         return datetime.min
 
     try:
+
         return datetime.fromisoformat(
             date_str.replace("Z", "+00:00")
         )
 
     except Exception:
+
         return datetime.min
+
+
+def extract_date_only(date_str: str) -> str:
+
+    parsed = parse_alert_date(date_str)
+
+    if parsed == datetime.min:
+        return "Unknown"
+
+    return parsed.strftime("%Y-%m-%d")
 
 
 def convert_duration_to_seconds(
     duration: str | None
 ) -> int:
-
-    """
-    Converts:
-        '1hr 31mins 7secs'
-    into:
-        5467
-    """
 
     if not duration:
         return 0
@@ -83,7 +88,7 @@ def safe_float(value):
 
 
 # =========================================================
-# ALERT ANALYZERS
+# ANALYZERS
 # =========================================================
 
 def analyze_overspeed(alert, analytics):
@@ -159,35 +164,10 @@ def analyze_afterhours(alert, analytics):
 
 
 # =========================================================
-# MAIN BUILDER
+# SHARED PREPROCESSING
 # =========================================================
 
-def build_alert_response(intent, api_result):
-
-    alerts_section = api_result.get("alerts")
-
-    if not isinstance(alerts_section, dict):
-
-        return {
-            "type": "error",
-            "message": "Alert data unavailable."
-        }
-
-    alerts = alerts_section.get("results", [])
-
-    if not alerts:
-
-        return {
-            "type": "error",
-            "message": (
-                "No alerts found for the selected "
-                "time range."
-            )
-        }
-
-    # =====================================================
-    # SORT ALERTS
-    # =====================================================
+def preprocess_alerts(alerts):
 
     alerts_sorted = sorted(
 
@@ -202,27 +182,19 @@ def build_alert_response(intent, api_result):
 
     latest_alert = alerts_sorted[0]
 
-    # =====================================================
-    # ANALYTICS STORAGE
-    # =====================================================
-
     analytics = {
 
         "overspeed": {
 
             "count": 0,
-
             "highest_value": 0,
-
             "highest": None
         },
 
         "idling": {
 
             "count": 0,
-
             "longest_seconds": 0,
-
             "longest": None
         },
 
@@ -232,14 +204,12 @@ def build_alert_response(intent, api_result):
         }
     }
 
-    # =====================================================
-    # DISTRIBUTION
-    # =====================================================
-
     alert_distribution = Counter()
 
+    daily_alerts = defaultdict(int)
+
     # =====================================================
-    # MAIN LOOP
+    # LOOP
     # =====================================================
 
     for alert in alerts:
@@ -251,42 +221,43 @@ def build_alert_response(intent, api_result):
 
         alert_distribution[alert_name] += 1
 
-        # -------------------------------------------------
-        # OVERSPEED
-        # -------------------------------------------------
+        alert_date = extract_date_only(
+            alert.get("Date")
+        )
 
-        if alert_name.lower() == "overspeed":
+        daily_alerts[alert_date] += 1
+
+        normalized_name = alert_name.lower()
+
+        if normalized_name == "overspeed":
 
             analyze_overspeed(
                 alert,
                 analytics
             )
 
-        # -------------------------------------------------
-        # IDLING
-        # -------------------------------------------------
-
-        elif alert_name.lower() == "idling":
+        elif normalized_name == "idling":
 
             analyze_idling(
                 alert,
                 analytics
             )
 
-        # -------------------------------------------------
-        # AFTER HOURS
-        # -------------------------------------------------
-
-        elif alert_name.lower() == "afterhoursmovement":
+        elif normalized_name == "afterhoursmovement":
 
             analyze_afterhours(
                 alert,
                 analytics
             )
 
-    # =====================================================
-    # MOST COMMON ALERT
-    # =====================================================
+    peak_alert_day = None
+
+    if daily_alerts:
+
+        peak_alert_day = max(
+            daily_alerts.items(),
+            key=lambda x: x[1]
+        )[0]
 
     most_common_alert = None
 
@@ -297,13 +268,137 @@ def build_alert_response(intent, api_result):
             key=lambda x: x[1]
         )[0]
 
-    # =====================================================
-    # FINAL RESPONSE
-    # =====================================================
+    return {
+
+        "alerts_sorted":
+            alerts_sorted,
+
+        "latest_alert":
+            latest_alert,
+
+        "analytics":
+            analytics,
+
+        "alert_distribution":
+            dict(alert_distribution),
+
+        "daily_alerts":
+            dict(daily_alerts),
+
+        "peak_alert_day":
+            peak_alert_day,
+
+        "most_common_alert":
+            most_common_alert
+    }
+
+
+# =========================================================
+# ALERT COUNT RESPONSE
+# =========================================================
+
+def build_alert_count_response(
+    intent,
+    alerts,
+    processed
+):
 
     return {
 
-        "type": "alert_summary",
+        "type":
+            "alert_count",
+
+        "vehicle":
+            intent.vehicle_id,
+
+        "total_alerts":
+            len(alerts)
+    }
+
+
+# =========================================================
+# LATEST ALERT RESPONSE
+# =========================================================
+
+def build_latest_alert_response(
+    intent,
+    processed
+):
+
+    latest = processed["latest_alert"]
+
+    return {
+
+        "type":
+            "latest_alert",
+
+        "vehicle":
+            intent.vehicle_id,
+
+        "latest_alert": {
+
+            "alert_name":
+                latest.get("AlertName"),
+
+            "time":
+                latest.get("Date"),
+
+            "limit":
+                latest.get("Limit"),
+
+            "value":
+                latest.get("CurrentValue"),
+
+            "duration":
+                latest.get("Duration"),
+
+            "location":
+                latest.get("Location")
+        }
+    }
+
+
+# =========================================================
+# DAILY ALERT SUMMARY
+# =========================================================
+
+def build_daily_alert_summary_response(
+    intent,
+    processed
+):
+
+    return {
+
+        "type":
+            "daily_alert_summary",
+
+        "vehicle":
+            intent.vehicle_id,
+
+        "daily_alerts":
+            processed["daily_alerts"],
+
+        "peak_alert_day":
+            processed["peak_alert_day"]
+    }
+
+
+# =========================================================
+# FULL SUMMARY
+# =========================================================
+
+def build_full_alert_summary_response(
+    intent,
+    alerts,
+    processed
+):
+
+    latest = processed["latest_alert"]
+
+    return {
+
+        "type":
+            "alert_summary",
 
         "vehicle":
             intent.vehicle_id,
@@ -312,54 +407,123 @@ def build_alert_response(intent, api_result):
             len(alerts),
 
         "alert_distribution":
-            dict(alert_distribution),
+            processed["alert_distribution"],
 
         "most_common_alert":
-            most_common_alert,
+            processed["most_common_alert"],
 
-        # -------------------------------------------------
-        # LATEST ALERT
-        # -------------------------------------------------
+        "daily_alerts":
+            processed["daily_alerts"],
+
+        "peak_alert_day":
+            processed["peak_alert_day"],
 
         "latest_alert": {
 
             "alert_name":
-                latest_alert.get("AlertName"),
+                latest.get("AlertName"),
 
             "time":
-                latest_alert.get("Date"),
+                latest.get("Date"),
 
             "limit":
-                latest_alert.get("Limit"),
+                latest.get("Limit"),
 
             "value":
-                latest_alert.get("CurrentValue"),
+                latest.get("CurrentValue"),
 
             "duration":
-                latest_alert.get("Duration"),
+                latest.get("Duration"),
 
             "location":
-                latest_alert.get("Location")
+                latest.get("Location")
         },
 
-        # -------------------------------------------------
-        # OVERSPEED
-        # -------------------------------------------------
-
         "overspeed":
-            analytics["overspeed"],
-
-        # -------------------------------------------------
-        # IDLING
-        # -------------------------------------------------
+            processed["analytics"]["overspeed"],
 
         "idling":
-            analytics["idling"],
-
-        # -------------------------------------------------
-        # AFTER HOURS
-        # -------------------------------------------------
+            processed["analytics"]["idling"],
 
         "afterhoursmovement":
-            analytics["afterhoursmovement"]
+            processed["analytics"]["afterhoursmovement"]
     }
+
+
+# =========================================================
+# MAIN ROUTER
+# =========================================================
+
+def build_alert_response(intent, api_result):
+
+    alerts_section = api_result.get("alerts")
+
+    if not isinstance(alerts_section, dict):
+
+        return {
+
+            "type": "error",
+
+            "message":
+                "Alert data unavailable."
+        }
+
+    alerts = alerts_section.get("results", [])
+
+    if not alerts:
+
+        return {
+
+            "type": "error",
+
+            "message":
+                "No alerts found for the selected time range."
+        }
+
+    processed = preprocess_alerts(alerts)
+
+    response_type = intent.alert_analysis
+
+    # =====================================================
+    # ALERT COUNT
+    # =====================================================
+
+    if response_type == "alert_count":
+
+        return build_alert_count_response(
+            intent,
+            alerts,
+            processed
+        )
+
+    # =====================================================
+    # LATEST ALERT
+    # =====================================================
+
+    elif response_type == "latest_alert":
+
+        return build_latest_alert_response(
+            intent,
+            processed
+        )
+
+    # =====================================================
+    # DAILY ALERT SUMMARY
+    # =====================================================
+
+    elif response_type == "daily_alert_summary":
+
+        return build_daily_alert_summary_response(
+            intent,
+            processed
+        )
+
+    # =====================================================
+    # DEFAULT FULL SUMMARY
+    # =====================================================
+
+    return build_full_alert_summary_response(
+        intent,
+        alerts,
+        processed
+    )

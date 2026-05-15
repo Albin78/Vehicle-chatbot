@@ -107,6 +107,7 @@ def combined_report(
             "fromDate": from_date,
             "toDate": to_date,
             "cid": company_id,
+            "fullRows": "true"
         }
 
         logger.info(f"Calling Combined Report API for vehicleID: {vehicle_id}")
