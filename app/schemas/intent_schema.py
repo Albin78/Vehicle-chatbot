@@ -48,7 +48,9 @@ class QueryIntent(BaseModel):
     ] = None
 
     time_range: Optional[tuple[str, str]] = None
-
+    
+    alert_response_type: str = ""
+    
     summary_requested: bool = False 
 
 

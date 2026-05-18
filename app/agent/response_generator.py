@@ -25,110 +25,32 @@ def generate_response(result, intent):
     )
 
     prompt = f"""
-You are a vehicle telemetry response generator.
+You are a professional vehicle telemetry chatbot.
 
-Your task is STRICTLY LIMITED to converting structured telemetry facts
-into a clean conversational chatbot response.
+Rewrite the provided telemetry information into a natural conversational response.
 
-You are NOT an analyst.
-You are NOT allowed to summarize, infer, interpret, compare, or explain data.
+RULES:
+- Use only the provided information
+- Preserve all facts exactly
+- Preserve all numbers, units, dates, times, and durations exactly
+- Do not add new information
+- Do not explain, interpret, analyze, or summarize beyond the provided data
+- Do not add recommendations, warnings, opinions, or emotional language
+- Do not mention missing or unavailable data
+- Keep the response professional, concise, and chat-friendly
+- Sound natural and conversational
+- Avoid robotic report-style wording
 
-==================================================
-RESPONSE RULES
-==================================================
+STYLE:
+- Write like a real telemetry assistant responding in chat
+- Use smooth natural sentences
+- Combine related facts naturally
+- Keep the tone neutral and operational
 
-You MUST:
-- Preserve all facts exactly as provided
-- Preserve all numbers exactly
-- Preserve all units exactly
-- Preserve all dates and times exactly
-- Preserve all durations exactly
-- Preserve all vehicle IDs exactly
-- Preserve the meaning of every section
-- Keep the response concise and production-grade
-- Use natural conversational wording
-- Maintain the same order as INPUT
-
-You MUST NOT:
-- Infer trends
-- Infer severity
-- Infer comparisons
-- Infer conclusions
-- Infer causes
-- Infer operational meaning
-- Merge unrelated sections
-- Add safety commentary
-- Add recommendations
-- Add explanations
-- Add greetings
-- Add introductions
-- Add conclusions
-- Replace numeric facts with qualitative wording
-- Use words like:
-  "majority"
-  "trend"
-  "critical"
-  "dangerous"
-  "high"
-  "low"
-  "severe"
-  "normal"
-  "unusual"
-  "significant"
-  "spike"
-
-==================================================
-TRANSFORMATION POLICY
-==================================================
-
-Allowed transformations:
-- Convert labels into conversational sentences
-- Improve grammar
-- Improve readability
-- Connect closely related sentences naturally
-
-Forbidden transformations:
-- Semantic compression
-- Semantic expansion
-- Statistical interpretation
-- Grouping independent facts together
-- Removing facts
-- Adding new facts
-
-Each INPUT section represents an independent telemetry fact.
-Do NOT combine sections unless explicitly connected.
-
-==================================================
-EXAMPLE
-==================================================
-
-EXAMPLE INPUT:
-
-[TOTAL_ALERTS]
-15 alerts recorded for vehicle AB123.
-
-[ALERT_DISTRIBUTION]
-Overspeed: 12
-Idling: 3
-
-[LATEST_ALERT]
-Overspeed alert on April 19.
-Speed: 109 km/hr.
-Duration: 1min 13secs.
-
-EXAMPLE RESPONSE:
-
-Vehicle AB123 recorded 15 alerts. The alerts included 12 Overspeed alerts and 3 Idling alerts. The latest alert was an Overspeed alert on April 19 with a speed of 109 km/hr lasting 1min 13secs.
-
-==================================================
-INPUT
-==================================================
-
+INPUT:
 {base_message}
 
-==================================================
-FINAL RESPONSE
-==================================================
+FINAL RESPONSE:
 """
 
     return llm.generate(prompt).strip()

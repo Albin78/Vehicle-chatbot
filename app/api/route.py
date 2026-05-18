@@ -66,7 +66,7 @@ def query_system(data: QueryRequest):
         vehicle_context = resolve_vehicle(intent.vehicle_id, company_id)
 
         if not vehicle_context:
-            return {"response": "Vehicle not found."}
+            return {"response": f"Vehicle not found for vehicle id {intent.vehicle_id}. Check the vehicle id or try other vehicle id"}
 
     imei = vehicle_context["imei"] if vehicle_context else None
     vehicle_id = vehicle_context["vehicle_id"] if vehicle_context else None

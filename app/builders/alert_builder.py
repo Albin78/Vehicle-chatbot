@@ -482,7 +482,7 @@ def build_alert_response(intent, api_result):
 
     processed = preprocess_alerts(alerts)
 
-    response_type = intent.alert_analysis
+    response_type = intent.alert_response_type
 
     # =====================================================
     # ALERT COUNT

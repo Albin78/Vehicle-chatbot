@@ -231,6 +231,10 @@
 # print(response.json())
 
 
-a = [10, 29, 39, 56, 78, 98]
-for i in enumerate(a):
-    print(i)
+a = [[1, 2]]
+b =  [x * 2 for x in a]
+c = a * 2
+c[0][0] = 10
+
+print(b)
+print(c)
