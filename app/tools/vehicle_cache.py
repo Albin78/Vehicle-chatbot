@@ -41,16 +41,33 @@ CACHE_TTL = {
 
 
 
-def normalize_vehicle_id(v_id: str):
+import re
+
+
+def normalize_vehicle_id(v_id: str) -> str:
 
     if not v_id:
         return ""
 
-    return re.sub(
-        r"[^A-Z0-9]",
-        "",
-        v_id.upper()
+    v_id = v_id.upper()
+
+    parts = re.findall(
+        r"[A-Z]+|\d+",
+        v_id
     )
+
+    numbers = []
+    letters = []
+
+    for part in parts:
+
+        if part.isdigit():
+            numbers.append(part)
+
+        else:
+            letters.append(part)
+
+    return "".join(numbers) + "".join(letters)
 
 
 # =========================================================

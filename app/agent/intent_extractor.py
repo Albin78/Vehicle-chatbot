@@ -2,10 +2,8 @@ from app.llm.ollama_client import OllamaClient
 from app.schemas.intent_schema import QueryIntent
 from app.utils.logger import logger
 
-from app.validators.intent_validators import (
-    sanitize_llm_output,
-    post_validate
-)
+from app.validators.intent_validator import sanitize_llm_output
+from app.validators.operation_validators import post_validate
 
 from app.parsers.date_parser import extract_time_range
 
@@ -235,5 +233,6 @@ JSON only
 
     logger.info(f"Final Intent Object: {intent}")
     logger.info(f"Intent Type: {type(intent)}")
+    logger.info(f"Vehicle id extracted: {intent.vehicle_id}")
 
     return intent

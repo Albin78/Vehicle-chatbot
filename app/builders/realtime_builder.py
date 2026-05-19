@@ -1,5 +1,5 @@
 from app.tools.vehicle_resolver import normalize_vehicle_id
-from app.utils.value_cleaner import clean_value
+from app.utils.value_cleaner import clean_value, safe_float
 from app.utils.response_utils import error_response
 from app.utils.logger import logger
 
@@ -19,7 +19,8 @@ REALTIME_METRIC_MAP = {
     "wasl": "WaslIdentityNumber",
     "fuel_consumed_today": "todayFuelConsumed",
     "seatbelt": "seatBelt",
-    "tanker_fuel_capacity": "TankerfuelCapacity"
+    "tanker_fuel_capacity": "TankerfuelCapacity",
+    "ignition": "ignitionOn"
 }
 
 
@@ -53,7 +54,7 @@ def derive_vehicle_status(vehicle):
     if vstatus in vstatus_map:
         return vstatus_map[vstatus]
 
-    speed = float(vehicle.get("speed", 0) or 0)
+    speed = safe_float(vehicle.get("speed"))
 
     if speed > 0:
         return "Moving"

@@ -18,7 +18,7 @@ def resolve_vehicle(vehicle_id: str, company_id: int):
     vehicle = cache["index"].get(key)
     
     if not vehicle:
-        logger.warning(f"[RESOLVER] Vehicle not found for ID: {vehicle_id}. Check the vehicle id or try other vehicle id.")
+        logger.warning(f"[RESOLVER] Vehicle not found for the id. Check the vehicle id or try other vehicle id.")
         return None
     
     logger.info(f"Vehicle cache: {vehicle}")

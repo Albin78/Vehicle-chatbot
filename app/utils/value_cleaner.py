@@ -32,3 +32,38 @@ def clean_value(value):
 def has_value(value):
 
     return clean_value(value) is not None
+
+
+def safe_float(value, default=0.0):
+
+    if value is None:
+        return default
+
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    if isinstance(value, str):
+
+        value = value.strip()
+
+        if not value:
+            return default
+
+        invalid_values = {
+            "N/A",
+            "NA",
+            "NULL",
+            "NONE",
+            "--",
+            "-",
+            "UNKNOWN"
+        }
+
+        if value.upper() in invalid_values:
+            return default
+
+    try:
+        return float(value)
+
+    except (ValueError, TypeError):
+        return default
