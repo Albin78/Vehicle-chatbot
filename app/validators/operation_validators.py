@@ -1,6 +1,6 @@
-
+from typing import Optional
 from app.utils.logger import logger
-from app.validators.intent_validator import (
+from .intent_validator import (
     resolve_vehicle,
     extract_metrics,
     VALID_METRICS, 
@@ -8,6 +8,29 @@ from app.validators.intent_validator import (
 )
 
 from app.tools.vehicle_cache import get_vehicle_cache
+
+
+ACTION_MAPPINGS = {
+
+    # canonical
+    "fetch": "fetch",
+    "update": "update",
+    "delete": "delete",
+
+    # synonyms
+    "check": "fetch",
+    "get": "fetch",
+    "retrieve": "fetch",
+    "show": "fetch",
+    "find": "fetch",
+    "lookup": "fetch",
+    "read": "fetch",
+
+    "modify": "update",
+    "edit": "update",
+
+    "remove": "delete"
+}
 
 # =========================================================
 # AGGREGATION
@@ -40,6 +63,17 @@ def extract_aggregation(query: str):
         return "minimum"
 
     return None
+
+
+
+def normalize_action(action: Optional[str]) -> str:
+
+    if not action:
+        return "fetch"
+
+    action = action.lower().strip()
+
+    return ACTION_MAPPINGS.get(action, "fetch")
 
 
 # =========================================================
@@ -177,9 +211,16 @@ def post_validate(
 ):
 
     try:
+
+        if clean_data:
+             clean_data["action"] = normalize_action(
+        clean_data.get("action")
+    )
+             
         vehicle_cache = get_vehicle_cache(company_id=16)
         vehicle_id = resolve_vehicle(query, vehicle_cache)
-
+        logger.info(f"Vehicle extracted from extraction function: {vehicle_id}")
+        
         if vehicle_id:
             clean_data["vehicle_id"] = vehicle_id
 
@@ -193,7 +234,8 @@ def post_validate(
 
             if metric in VALID_METRICS:
                 valid_metrics.append(metric)
-
+        
+       
         clean_data["metrics"] = list(set(valid_metrics))
 
 
@@ -231,6 +273,8 @@ def post_validate(
 
         if clean_data["summary_requested"]:
             clean_data["metrics"] = []
+        
+        logger.info(f"Clean data from post validate: {clean_data}")
 
         return clean_data
 

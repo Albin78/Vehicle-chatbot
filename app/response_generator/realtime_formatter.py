@@ -1,279 +1,480 @@
 from app.response_generator.metric_formatter import (
-    get_unit,
     clean_driver_name,
     interpret_metric_value
 )
 
-from app.utils.value_cleaner import has_value
-from app.utils.logger import logger
+from app.utils.value_cleaner import (
+    has_value
+)
 
 
 # =========================================================
-# SAFE VALUE
+# LOCATION
 # =========================================================
 
-def safe_value(value, suffix=""):
+def format_location(location_data):
 
-    if value in [None, "", "NA", "null"]:
+    if not isinstance(location_data, dict):
         return None
 
-    return f"{value}{suffix}"
+    google_maps = location_data.get(
+        "google_maps_url"
+    )
+
+    if not has_value(google_maps):
+        return None
+
+    return f"Location map: {google_maps}"
 
 
 # =========================================================
-# REALTIME FORMATTER
+# FIELD FORMATTERS
+# =========================================================
+
+FIELD_FORMATTERS = {
+
+    # -----------------------------------------------------
+    # SPEED
+    # -----------------------------------------------------
+
+    "speed":
+        lambda v:
+            f"Speed is {v} km/h",
+
+    # -----------------------------------------------------
+    # BATTERY
+    # -----------------------------------------------------
+
+    "battery":
+        lambda v:
+            f"Battery voltage is {v} V",
+
+    # -----------------------------------------------------
+    # FUEL
+    # -----------------------------------------------------
+
+    "fuel_level":
+        lambda v:
+            f"Fuel level is {v} L",
+
+    "fuel_percentage":
+        lambda v:
+            f"Fuel level is {v}%",
+
+    "fuel_capacity":
+        lambda v:
+            f"Fuel capacity is {v} L",
+
+    "today_fuel_consumed":
+        lambda v:
+            f"Today's fuel consumed is {v} L",
+
+    "tanker_fuel_capacity":
+        lambda v:
+            f"Tanker fuel capacity is {v} L",
+
+    "tanker_fuel_percentage":
+        lambda v:
+            f"Tanker fuel level is {v}%",
+
+    # -----------------------------------------------------
+    # DRIVER / GROUP
+    # -----------------------------------------------------
+
+    "driver_name":
+        lambda v:
+            f"Driver assigned is "
+            f"{clean_driver_name(v)}",
+
+    "group_name":
+        lambda v:
+            f"Vehicle group is {v}",
+
+    # -----------------------------------------------------
+    # VEHICLE INFO
+    # -----------------------------------------------------
+
+    "vehicle_type":
+        lambda v:
+            f"Vehicle type is {v}",
+
+    "make":
+        lambda v:
+            f"Manufacturer is {v}",
+
+    "imei":
+        lambda v:
+            f"IMEI is {v}",
+
+    "wasl":
+        lambda v:
+            f"WASL identity number is {v}",
+
+    # -----------------------------------------------------
+    # OPERATIONAL
+    # -----------------------------------------------------
+
+    "weight":
+        lambda v:
+            f"Weight is {v}",
+
+    "mileage":
+        lambda v:
+            f"Mileage is {v}",
+
+    "odometer_reading":
+        lambda v:
+            f"Odometer reading is {v}",
+
+    # -----------------------------------------------------
+    # ENGINE
+    # -----------------------------------------------------
+
+    "engine_status":
+        lambda v:
+            f"Engine status is {v}",
+
+    "engine_temperature":
+        lambda v:
+            f"Engine temperature is {v} °C",
+
+    "engine_rpm":
+        lambda v:
+            f"Engine RPM is {v}",
+
+    "engine_hours":
+        lambda v:
+            f"Engine hours are {v}",
+
+    # -----------------------------------------------------
+    # CONNECTIVITY
+    # -----------------------------------------------------
+
+    "gsm_signal":
+        lambda v:
+            f"GSM signal is {v}",
+
+    "network":
+        lambda v:
+            f"Network type is {v}",
+}
+
+
+# =========================================================
+# SUMMARY FIELD ORDER
+# =========================================================
+
+SUMMARY_FIELDS = [
+
+    # Fuel
+    "fuel_level",
+    "fuel_percentage",
+    "fuel_capacity",
+    "today_fuel_consumed",
+    "tanker_fuel_capacity",
+    "tanker_fuel_percentage",
+
+    # Electrical
+    "battery",
+
+    # Identity
+    "imei",
+    "vehicle_type",
+    "make",
+    "group_name",
+    "driver_name",
+
+    # Vehicle state
+    "ignition",
+    "seatbelt",
+    "door_open",
+    "camera_status",
+    "remote_immobilization",
+
+    # Engine
+    "engine_status",
+    "engine_temperature",
+    "engine_rpm",
+    "engine_hours",
+
+    # Operational
+    "weight",
+    "mileage",
+    "odometer_reading",
+
+    # Connectivity
+    "network",
+    "gsm_signal",
+
+    # Compliance
+    "wasl",
+]
+
+
+# =========================================================
+# SPECIAL METRICS
+# =========================================================
+
+SPECIAL_METRICS = {
+
+    "ignition",
+    "seatbelt",
+    "door_open",
+    "camera_status",
+    "remote_immobilization",
+}
+
+
+# =========================================================
+# FORMAT METRIC
+# =========================================================
+
+def format_metric(metric, value):
+
+    # -----------------------------------------------------
+    # EMPTY / INVALID
+    # -----------------------------------------------------
+
+    if not has_value(value):
+        return None
+
+    # -----------------------------------------------------
+    # SPECIAL METRICS
+    # -----------------------------------------------------
+
+    if metric in SPECIAL_METRICS:
+
+        interpreted = interpret_metric_value(
+            metric,
+            value
+        )
+
+        if (
+            interpreted
+            and interpreted.get("available")
+            and interpreted.get("text")
+        ):
+
+            return interpreted["text"]
+
+        return None
+
+    # -----------------------------------------------------
+    # STANDARD FORMATTERS
+    # -----------------------------------------------------
+
+    formatter = FIELD_FORMATTERS.get(metric)
+
+    if formatter:
+
+        try:
+            return formatter(value)
+
+        except Exception:
+            return None
+
+    # -----------------------------------------------------
+    # FALLBACK
+    # -----------------------------------------------------
+
+    readable_metric = metric.replace(
+        "_",
+        " "
+    ).capitalize()
+
+    return f"{readable_metric} is {value}"
+
+
+# =========================================================
+# REALTIME METRIC FORMATTER
+# =========================================================
+
+def format_realtime_metric(result):
+
+    vehicle = result.get("vehicle")
+
+    metrics = result.get(
+        "metrics",
+        {}
+    )
+
+    parts = []
+
+    # -----------------------------------------------------
+    # METRICS
+    # -----------------------------------------------------
+
+    for metric, value in metrics.items():
+
+        formatted = format_metric(
+            metric,
+            value
+        )
+
+        if formatted:
+            parts.append(formatted)
+
+    # -----------------------------------------------------
+    # LAST UPDATED
+    # -----------------------------------------------------
+
+    last_updated = result.get(
+        "last_updated"
+    )
+
+    if has_value(last_updated):
+
+        parts.append(
+            f"Last updated {last_updated}"
+        )
+
+    # -----------------------------------------------------
+    # EMPTY RESPONSE
+    # -----------------------------------------------------
+
+    if not parts:
+
+        return (
+            f"No realtime telemetry data "
+            f"is currently available "
+            f"for vehicle {vehicle}"
+        )
+
+    # -----------------------------------------------------
+    # FINAL RESPONSE
+    # -----------------------------------------------------
+
+    return (
+        f"For vehicle {vehicle}, "
+        + ". ".join(parts)
+        + "."
+    )
+
+
+# =========================================================
+# REALTIME STATUS FORMATTER
+# =========================================================
+
+def format_realtime_status(result):
+
+    vehicle = result.get("vehicle")
+
+    parts = []
+
+    # -----------------------------------------------------
+    # STATUS + SPEED
+    # -----------------------------------------------------
+
+    status = result.get("status")
+
+    speed = result.get("speed")
+
+    if has_value(status):
+
+        if (
+            str(status).lower() == "moving"
+            and has_value(speed)
+        ):
+
+            parts.append(
+                f"Vehicle {vehicle} is currently "
+                f"moving at {speed} km/h"
+            )
+
+        else:
+
+            parts.append(
+                f"Vehicle {vehicle} status is {status}"
+            )
+
+    # -----------------------------------------------------
+    # SUMMARY METRICS
+    # -----------------------------------------------------
+
+    for field in SUMMARY_FIELDS:
+
+        formatted = format_metric(
+            field,
+            result.get(field)
+        )
+
+        if formatted:
+            parts.append(formatted)
+
+    # -----------------------------------------------------
+    # LOCATION
+    # -----------------------------------------------------
+
+    location_text = format_location(
+        result.get("location")
+    )
+
+    if location_text:
+        parts.append(location_text)
+
+    # -----------------------------------------------------
+    # LAST UPDATED
+    # -----------------------------------------------------
+
+    last_updated = result.get(
+        "last_updated"
+    )
+
+    if has_value(last_updated):
+
+        parts.append(
+            f"Last updated {last_updated}"
+        )
+
+    # -----------------------------------------------------
+    # EMPTY RESPONSE
+    # -----------------------------------------------------
+
+    if not parts:
+
+        return (
+            f"No realtime status data "
+            f"is currently available "
+            f"for vehicle {vehicle}"
+        )
+
+    # -----------------------------------------------------
+    # FINAL RESPONSE
+    # -----------------------------------------------------
+
+    return ". ".join(parts) + "."
+
+
+# =========================================================
+# MAIN FORMATTER ENTRY
 # =========================================================
 
 def format_realtime(result, intent):
 
     result_type = result.get("type")
 
-    # =====================================================
-    # REALTIME METRIC
-    # =====================================================
+    # -----------------------------------------------------
+    # REALTIME METRIC RESPONSE
+    # -----------------------------------------------------
 
     if result_type == "realtime_metric":
 
-        vehicle = result.get("vehicle")
-
-        metrics = result.get("metrics", {})
-
-        invalid_metrics = result.get(
-            "invalid_metrics",
-            []
+        return format_realtime_metric(
+            result
         )
 
-        parts = []
-
-        # ---------------------------------------------
-        # VALID METRICS
-        # ---------------------------------------------
-
-        for metric, value in metrics.items():
-
-            readable_metric = metric.replace(
-                "_",
-                " "
-            )
-
-            # -----------------------------------------
-            # INTERPRET RAW API VALUE
-            # -----------------------------------------
-
-            interpreted_value = interpret_metric_value(
-                metric,
-                value
-            )
-            
-            logger.info(f"Interpreted value: {interpreted_value}")
-            if has_value(interpreted_value):
-
-                unit = get_unit(metric)
-
-                if unit:
-
-                    parts.append(
-                        f"{readable_metric} is "
-                        f"{interpreted_value} {unit}"
-                    )
-
-                else:
-
-                    parts.append(
-                        f"{readable_metric} is "
-                        f"{interpreted_value}"
-                    )
-
-            else:
-
-                parts.append(
-                    f"{readable_metric} data "
-                    f"is currently unavailable"
-                )
-
-        # ---------------------------------------------
-        # INVALID METRICS
-        # ---------------------------------------------
-
-        if invalid_metrics:
-
-            invalid_text = ", ".join(
-                invalid_metrics
-            )
-
-            parts.append(
-                f"{invalid_text} "
-                f"metric is not supported currently"
-            )
-
-        # ---------------------------------------------
-        # LAST UPDATED
-        # ---------------------------------------------
-
-        if has_value(result.get("last_updated")):
-
-            parts.append(
-                f"last updated "
-                f"{result.get('last_updated')}"
-            )
-
-        return (
-            f"For vehicle {vehicle}, "
-            + ". ".join(parts)
-            + "."
-        )
-
-    # =====================================================
-    # REALTIME STATUS
-    # =====================================================
+    # -----------------------------------------------------
+    # REALTIME STATUS RESPONSE
+    # -----------------------------------------------------
 
     if result_type == "realtime_status":
 
-        parts = []
-
-        vehicle = result.get("vehicle")
-
-        status = result.get("status")
-
-        parts.append(
-            f"Vehicle {vehicle} "
-            f"is currently {status}"
+        return format_realtime_status(
+            result
         )
 
-        if has_value(result.get("speed")):
-
-            parts.append(
-                f"speed is "
-                f"{result.get('speed')} km/h"
-            )
-
-        if has_value(result.get("battery")):
-
-            parts.append(
-                f"battery voltage is "
-                f"{result.get('battery')} V"
-            )
-
-        else:
-
-            parts.append(
-                "battery data is currently unavailable"
-            )
-
-        if has_value(result.get("fuel_level")):
-
-            parts.append(
-                f"fuel level is "
-                f"{result.get('fuel_level')}"
-            )
-
-        else:
-
-            parts.append(
-                "fuel level data is unavailable"
-            )
-
-        if has_value(result.get("fuel_capacity")):
-
-            parts.append(
-                f"fuel capacity is "
-                f"{result.get('fuel_capacity')} L"
-            )
-
-        if has_value(
-            result.get("tankerfuelcapacity")
-        ):
-
-            parts.append(
-                f"tanker capacity is "
-                f"{result.get('tankerfuelcapacity')} L"
-            )
-
-        if has_value(result.get("weight")):
-
-            parts.append(
-                f"vehicle weight is "
-                f"{result.get('weight')} kg"
-            )
-
-        else:
-
-            parts.append(
-                "vehicle weight data is unavailable"
-            )
-
-        if has_value(result.get("seatbelt")):
-
-            parts.append(
-                f"seatbelt status is "
-                f"{result.get('seatbelt')}"
-            )
-
-        else:
-
-            parts.append(
-                "seatbelt data is unavailable"
-            )
-
-        if has_value(result.get("door_open")):
-
-            parts.append(
-                f"door status is "
-                f"{result.get('door_open')}"
-            )
-
-        else:
-
-            parts.append(
-                "door status data is unavailable"
-            )
-
-        if has_value(result.get("driver")):
-
-            driver = clean_driver_name(
-                result.get("driver")
-            )
-
-            parts.append(
-                f"assigned driver is {driver}"
-            )
-
-        if has_value(result.get("wasl")):
-
-            parts.append(
-                f"vehicle Wasl registration is "
-                f"{result.get('wasl')}"
-            )
-
-        if has_value(result.get("imei")):
-
-            parts.append(
-                f"IMEI is "
-                f"{result.get('imei')}"
-            )
-
-
-        if has_value(result.get("vehicle_type")):
-
-            parts.append(
-                f"vehicle type is "
-                f"{result.get('vehicle_type')}"
-            )
-
-        if has_value(result.get("make")):
-
-            parts.append(
-                f"manufacturer is "
-                f"{result.get('make')}"
-            )
-
-        if has_value(result.get("last_updated")):
-
-            parts.append(
-                f"last updated "
-                f"{result.get('last_updated')}"
-            )
-
-        return ". ".join(parts) + "."
+    # -----------------------------------------------------
+    # UNKNOWN
+    # -----------------------------------------------------
 
     return "Realtime data unavailable."

@@ -2,27 +2,87 @@ from app.tools.vehicle_resolver import normalize_vehicle_id
 from app.utils.value_cleaner import clean_value, safe_float
 from app.utils.response_utils import error_response
 from app.utils.logger import logger
+from app.parsers.result_fomat_parser import (
+    format_last_updated,
+    build_location
+)
 
+
+# =========================================================
+# REALTIME METRIC FIELD MAP
+# =========================================================
 
 REALTIME_METRIC_MAP = {
+
     "speed": "speed",
+
     "weight": "Weight",
+
     "fuel_capacity": "fuelCapacity",
-    "battery": "batteryLevel",
+
     "fuel_level": "fuelLevel",
-    "mileage": "mileage",
-    "seatbelt": "seatBelt",
-    "door_open": "doorOpen",
-    "imei": "IMEI",
-    "vehicle_type": "typeName",
-    "make": "makeName",
-    "wasl": "WaslIdentityNumber",
-    "fuel_consumed_today": "todayFuelConsumed",
-    "seatbelt": "seatBelt",
+
+    "fuel_percentage": "fuelPercentage",
+
+    "today_fuel_consumed": "todayFuelConsumed",
+
     "tanker_fuel_capacity": "TankerfuelCapacity",
-    "ignition": "ignitionOn"
+
+    "tanker_fuel_percentage": "tankerFuelPercentage",
+
+    "battery": "batteryLevel",
+
+    "mileage": "mileage",
+
+    "odometer_reading": "odometerReading",
+
+    "seatbelt": "seatBelt",
+
+    "door_open": "doorOpen",
+
+    "imei": "IMEI",
+
+    "vehicle_type": "typeName",
+
+    "make": "makeName",
+
+    "wasl": "WaslIdentityNumber",
+
+    "ignition": "ignitionOn",
+
+    "engine_status": "engineStatus",
+
+    "engine_temperature": "engineTemperature",
+
+    "engine_rpm": "engineRpm",
+
+    "engine_hours": "engineHours",
+
+    "driver_name": "driverName",
+
+    "group_name": "groupName",
+
+    "network": "networkType",
+
+    "gsm_signal": "gsmSignal",
+
+    "satellites": "satellites",
+
+    "camera_status": "cameraStatus",
+
+    "remote_immobilization": "RemoteImmobilaztion",
+
+    "latitude": "lat",
+
+    "longitude": "lon",
+
+    "last_updated": "lastRecordAt"
 }
 
+
+# =========================================================
+# FILTER VEHICLE
+# =========================================================
 
 def filter_vehicle(records, vehicle_id):
 
@@ -40,9 +100,14 @@ def filter_vehicle(records, vehicle_id):
     return None
 
 
+# =========================================================
+# DERIVE VEHICLE STATUS
+# =========================================================
+
 def derive_vehicle_status(vehicle):
 
     vstatus_map = {
+
         1: "Moving",
         2: "Idle",
         3: "Stopped",
@@ -54,7 +119,9 @@ def derive_vehicle_status(vehicle):
     if vstatus in vstatus_map:
         return vstatus_map[vstatus]
 
-    speed = safe_float(vehicle.get("speed"))
+    speed = safe_float(
+        vehicle.get("speed")
+    )
 
     if speed > 0:
         return "Moving"
@@ -62,6 +129,9 @@ def derive_vehicle_status(vehicle):
     return "Stopped"
 
 
+# =========================================================
+# BUILD METRIC RESPONSE
+# =========================================================
 
 def build_metric_response(vehicle, metrics):
 
@@ -70,26 +140,75 @@ def build_metric_response(vehicle, metrics):
     )
 
     if not metrics:
+
         return error_response(
             "No realtime metrics requested"
         )
 
     metric_values = {}
+
     invalid_metrics = []
 
     for metric in metrics:
 
         metric = metric.lower()
 
-        if metric not in REALTIME_METRIC_MAP:
-            invalid_metrics.append(metric)
+        # ---------------------------------------------
+        # LOCATION SPECIAL CASE
+        # ---------------------------------------------
+
+        if metric == "location":
+
+            metric_values["location"] = build_location(
+                vehicle.get("lat"),
+                vehicle.get("lon")
+            )
+
             continue
+
+        if metric not in REALTIME_METRIC_MAP:
+
+            invalid_metrics.append(metric)
+
+            continue
+
+        # =====================================================
+        # CAMERA STATUS
+        # =====================================================
+
+        if metric == "camera_status":
+
+            metric_values[metric] = {
+
+                "status":
+                    vehicle.get("CameraStatus"),
+
+                "channels":
+                    vehicle.get("CameraChannel")
+            }
+
+            continue
+
+
+        # =====================================================
+        # NORMAL FIELDS
+        # =====================================================
 
         field = REALTIME_METRIC_MAP[metric]
 
         value = vehicle.get(field)
 
         metric_values[metric] = value
+
+        # ---------------------------------------------
+        # FORMAT LAST UPDATED
+        # ---------------------------------------------
+
+        if metric == "last_updated":
+
+            value = format_last_updated(value)
+
+        metric_values[metric] = clean_value(value)
 
     if not metric_values:
 
@@ -101,17 +220,23 @@ def build_metric_response(vehicle, metrics):
 
         "type": "realtime_metric",
 
-        "vehicle": vehicle.get("numberPlate"),
+        "vehicle": clean_value(
+            vehicle.get("numberPlate")
+        ),
 
         "metrics": metric_values,
 
         "invalid_metrics": invalid_metrics,
 
-        "last_updated":
-            vehicle.get("lastUpdatedTime")
+        "last_updated": format_last_updated(
+            vehicle.get("lastRecordAt")
+        )
     }
 
 
+# =========================================================
+# BUILD STATUS RESPONSE
+# =========================================================
 
 def build_status_response(vehicle):
 
@@ -141,36 +266,53 @@ def build_status_response(vehicle):
             vehicle.get("fuelCapacity")
         ),
 
-        "driver": clean_value(
-            vehicle.get("driverName")
+        "fuel_percentage": clean_value(
+            vehicle.get("fuelPercentage")
         ),
 
-        "location": clean_value(
-            vehicle.get("Location")
+        "today_fuel_consumed": clean_value(
+            vehicle.get("todayFuelConsumed")
         ),
 
-        "last_updated": clean_value(
-            vehicle.get("lastUpdatedTime")
-        ),
-
-        "tankerfuelcapacity": clean_value(
+        "tanker_fuel_capacity": clean_value(
             vehicle.get("TankerfuelCapacity")
         ),
 
-        "fuelpercentage": clean_value(
-            vehicle.get("fuelPercentage")
+        "tanker_fuel_percentage": clean_value(
+            vehicle.get("tankerFuelPercentage")
+        ),
+
+        "driver_name": clean_value(
+            vehicle.get("driverName")
+        ),
+
+        "group_name": clean_value(
+            vehicle.get("groupName")
+        ),
+
+        # ---------------------------------------------
+        # LOCATION OBJECT
+        # ---------------------------------------------
+
+        "location": build_location(
+            vehicle.get("lat"),
+            vehicle.get("lon")
         ),
 
         "weight": clean_value(
             vehicle.get("Weight")
         ),
 
-        "wasl": clean_value(
-            vehicle.get("WaslIdentityNumber")
+        "mileage": clean_value(
+            vehicle.get("mileage")
         ),
 
-        "fuelconsumed_today": clean_value(
-            vehicle.get("todayFuelConsumed")
+        "odometer_reading": clean_value(
+            vehicle.get("odometerReading")
+        ),
+
+        "wasl": clean_value(
+            vehicle.get("WaslIdentityNumber")
         ),
 
         "imei": clean_value(
@@ -181,7 +323,7 @@ def build_status_response(vehicle):
             vehicle.get("seatBelt")
         ),
 
-        "door_status": clean_value(
+        "door_open": clean_value(
             vehicle.get("doorOpen")
         ),
 
@@ -191,9 +333,57 @@ def build_status_response(vehicle):
 
         "make": clean_value(
             vehicle.get("makeName")
+        ),
+
+        "ignition": clean_value(
+            vehicle.get("ignitionOn")
+        ),
+
+        "engine_status": clean_value(
+            vehicle.get("engineStatus")
+        ),
+
+        "engine_temperature": clean_value(
+            vehicle.get("engineTemperature")
+        ),
+
+        "engine_rpm": clean_value(
+            vehicle.get("engineRpm")
+        ),
+
+        "engine_hours": clean_value(
+            vehicle.get("engineHours")
+        ),
+
+        "gsm_signal": clean_value(
+            vehicle.get("gsmSignal")
+        ),
+
+        "network": clean_value(
+            vehicle.get("networkType")
+        ),
+
+        "satellites": clean_value(
+            vehicle.get("satellites")
+        ),
+
+        "camera_status": clean_value(
+            vehicle.get("cameraStatus")
+        ),
+
+        "remote_immobilization": clean_value(
+            vehicle.get("RemoteImmobilaztion")
+        ),
+
+        "last_updated": format_last_updated(
+            vehicle.get("lastRecordAt")
         )
     }
 
+
+# =========================================================
+# MAIN RESPONSE BUILDER
+# =========================================================
 
 def build_realtime_response(intent, api_result):
 
@@ -206,6 +396,7 @@ def build_realtime_response(intent, api_result):
     )
 
     if not records:
+
         return error_response(
             "No realtime records found"
         )
@@ -216,6 +407,7 @@ def build_realtime_response(intent, api_result):
     )
 
     if not vehicle:
+
         return error_response(
             "Vehicle realtime data not found"
         )

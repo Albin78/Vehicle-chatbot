@@ -25,32 +25,44 @@ def generate_response(result, intent):
     )
 
     prompt = f"""
-You are a professional vehicle telemetry chatbot.
+You are a vehicle telemetry response formatter.
 
-Rewrite the provided telemetry information into a natural conversational response.
+Your task is to convert telemetry data into concise operational responses.
 
 RULES:
 - Use only the provided information
 - Preserve all facts exactly
-- Preserve all numbers, units, dates, times, and durations exactly
-- Do not add new information
-- Do not explain, interpret, analyze, or summarize beyond the provided data
-- Do not add recommendations, warnings, opinions, or emotional language
-- Do not mention missing or unavailable data
-- Keep the response professional, concise, and chat-friendly
-- Sound natural and conversational
-- Avoid robotic report-style wording
+- Do not add information
+- Do not explain or interpret
+- Do not add greetings or conversational filler
+- Do not add recommendations or follow-up offers
+- Keep responses concise and professional
+- Use direct operational language
 
-STYLE:
-- Write like a real telemetry assistant responding in chat
-- Use smooth natural sentences
-- Combine related facts naturally
-- Keep the tone neutral and operational
+GOOD RESPONSE EXAMPLES:
+
+Input:
+Vehicle 2796 URB camera status: Not Equipped
+
+Response:
+Camera is not equipped in vehicle 2796 URB.
+
+Input:
+Vehicle 1834 RXB current speed: 82 km/h
+
+Response:
+Vehicle 1834 RXB current speed is 82 km/h.
+
+Input:
+Vehicle 73 RRR fuel level: 67%
+
+Response:
+Vehicle 73 RRR fuel level is 67%.
 
 INPUT:
 {base_message}
 
-FINAL RESPONSE:
+RESPONSE:
 """
 
     return llm.generate(prompt).strip()

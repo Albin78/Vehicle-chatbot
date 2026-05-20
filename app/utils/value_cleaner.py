@@ -1,4 +1,5 @@
-# app/utils/value_cleaner.py
+from typing import Any
+
 
 INVALID_VALUES = {
     None,
@@ -13,28 +14,47 @@ INVALID_VALUES = {
 }
 
 
-def clean_value(value):
+def clean_value(value: Any):
+
+    # -----------------------------------------
+    # STRING CLEANING
+    # -----------------------------------------
 
     if isinstance(value, str):
         value = value.strip()
-    
+
+    # -----------------------------------------
+    # DICT SPECIAL CASE
+    # -----------------------------------------
+
     if isinstance(value, dict):
-        if value.get("text") in INVALID_VALUES:
+
+        text = value.get("text")
+
+        if text in INVALID_VALUES:
             return None
-        
-        
-    if not isinstance(value, dict) and value in INVALID_VALUES:
+
+        return value
+
+    # -----------------------------------------
+    # NORMAL VALUES
+    # -----------------------------------------
+
+    if value in INVALID_VALUES:
         return None
 
     return value
 
 
-def has_value(value):
+def has_value(value: Any) -> bool:
 
     return clean_value(value) is not None
 
 
-def safe_float(value, default=0.0):
+def safe_float(
+    value: Any,
+    default: float = 0.0
+) -> float:
 
     if value is None:
         return default
@@ -62,8 +82,10 @@ def safe_float(value, default=0.0):
         if value.upper() in invalid_values:
             return default
 
-    try:
-        return float(value)
+        try:
+            return float(value)
 
-    except (ValueError, TypeError):
-        return default
+        except ValueError:
+            return default
+
+    return default
