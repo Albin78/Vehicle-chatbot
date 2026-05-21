@@ -34,7 +34,7 @@ REALTIME_METRIC_MAP = {
 
     "mileage": "mileage",
 
-    "odometer_reading": "odometerReading",
+    "odometer_reading": "odometerCurrentReading",
 
     "seatbelt": "seatBelt",
 

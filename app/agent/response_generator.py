@@ -39,26 +39,6 @@ RULES:
 - Keep responses concise and professional
 - Use direct operational language
 
-GOOD RESPONSE EXAMPLES:
-
-Input:
-Vehicle 2796 URB camera status: Not Equipped
-
-Response:
-Camera is not equipped in vehicle 2796 URB.
-
-Input:
-Vehicle 1834 RXB current speed: 82 km/h
-
-Response:
-Vehicle 1834 RXB current speed is 82 km/h.
-
-Input:
-Vehicle 73 RRR fuel level: 67%
-
-Response:
-Vehicle 73 RRR fuel level is 67%.
-
 INPUT:
 {base_message}
 

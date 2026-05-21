@@ -71,6 +71,10 @@ def is_invalid_value(value: Any) -> bool:
         "--"
     }
 
+    # Dicts are considered valid (could be location, camera_status, etc.)
+    if isinstance(value, dict):
+        return False
+
     if isinstance(value, str):
 
         value = value.strip().upper()
@@ -183,8 +187,8 @@ def interpret_metric_value(
                 "available": True,
                 "text":
                     (
-                        "seatbelt is not fastened "
-                        "and seat is not occupied"
+                        "seatbelt is equipped but not fastened "
+                        
                     )
             }
 
@@ -194,15 +198,14 @@ def interpret_metric_value(
                 "available": True,
                 "text":
                     (
-                        "seatbelt is fastened "
-                        "and seat is occupied"
+                        "seatbelt is equipped but is fastened "
                     )
             }
 
         return {
             "available": True,
             "text":
-                "seat is occupied"
+                "seat is not equipped"
         }
 
     # =====================================================

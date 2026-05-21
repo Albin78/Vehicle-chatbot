@@ -8,12 +8,13 @@ from app.utils.logger import logger
 # =========================================================
 
 DEFAULT_INTENT = {
-    "action": "fetch",
+    "action": None,
     "vehicle_id": None,
     "source": None,
     "metrics": [],
     "aggregation": None,
     "alert_analysis": None,
+    "alert_focus": None,
     "time_range": None,
     "summary_requested": False
 }
@@ -324,10 +325,6 @@ def normalize_vehicle_id(value: str) -> str:
     return "".join(numbers) + "".join(letters)
 
 
-# =========================================================
-# VEHICLE EXTRACTION PATTERNS
-# =========================================================
-
 VEHICLE_PATTERNS = [
 
     # 1834RXB
@@ -373,10 +370,6 @@ VEHICLE_PATTERNS = [
 ]
 
 
-# =========================================================
-# PREFIX REMOVAL
-# =========================================================
-
 KNOWN_PREFIXES = [
     "VEHICLE",
     "TRUCK",
@@ -406,10 +399,6 @@ def remove_known_prefixes(query: str) -> str:
 
     return query
 
-
-# =========================================================
-# VEHICLE EXTRACTION
-# =========================================================
 
 def extract_vehicle_candidates(query: str):
 
@@ -441,6 +430,7 @@ def extract_vehicle_candidates(query: str):
         for raw in matches:
 
             normalized = normalize_vehicle_id(raw)
+            logger.info(f"Normalized vehicle id from intent validation: {normalized}")
 
             if normalized:
                 candidates.append(normalized)
@@ -468,12 +458,13 @@ def extract_vehicle_candidates(query: str):
 
 
 def build_vehicle_lookup(vehicle_cache):
-
+    
+    # logger.info(f"Vehicle cache passed to lookup: {vehicle_cache}")
     lookup = {}
 
     for vehicle in vehicle_cache["data"]:
 
-        vehicle_id = vehicle.get("vehicle_id")
+        vehicle_id = vehicle.get("NumberPlate")
 
         if vehicle_id:
 
@@ -495,7 +486,7 @@ def resolve_vehicle(query, vehicle_cache):
         vehicle = vehicle_lookup.get(candidate)
 
         if vehicle:
-            return vehicle
+            return candidate
 
     return None
 

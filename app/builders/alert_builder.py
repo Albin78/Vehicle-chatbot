@@ -1,90 +1,10 @@
 from collections import Counter, defaultdict
-from datetime import datetime
-import re
-
-
-# =========================================================
-# HELPERS
-# =========================================================
-
-def parse_alert_date(date_str: str):
-
-    if not date_str:
-        return datetime.min
-
-    try:
-
-        return datetime.fromisoformat(
-            date_str.replace("Z", "+00:00")
-        )
-
-    except Exception:
-
-        return datetime.min
-
-
-def extract_date_only(date_str: str) -> str:
-
-    parsed = parse_alert_date(date_str)
-
-    if parsed == datetime.min:
-        return "Unknown"
-
-    return parsed.strftime("%Y-%m-%d")
-
-
-def convert_duration_to_seconds(
-    duration: str | None
-) -> int:
-
-    if not duration:
-        return 0
-
-    hours = 0
-    minutes = 0
-    seconds = 0
-
-    hr_match = re.search(
-        r"(\d+)\s*hr",
-        duration,
-        re.IGNORECASE
-    )
-
-    min_match = re.search(
-        r"(\d+)\s*min",
-        duration,
-        re.IGNORECASE
-    )
-
-    sec_match = re.search(
-        r"(\d+)\s*sec",
-        duration,
-        re.IGNORECASE
-    )
-
-    if hr_match:
-        hours = int(hr_match.group(1))
-
-    if min_match:
-        minutes = int(min_match.group(1))
-
-    if sec_match:
-        seconds = int(sec_match.group(1))
-
-    return (
-        hours * 3600
-        + minutes * 60
-        + seconds
-    )
-
-
-def safe_float(value):
-
-    try:
-        return float(value)
-
-    except Exception:
-        return 0.0
+from app.parsers.builder_parsers import (
+    parse_alert_date,
+    extract_date_only,
+    convert_duration_to_seconds,
+    safe_float
+)
 
 
 # =========================================================
@@ -290,6 +210,81 @@ def preprocess_alerts(alerts):
 
         "most_common_alert":
             most_common_alert
+    }
+
+
+
+def build_overspeed_summary_response(
+    intent,
+    processed
+):
+
+    return {
+
+        "type":
+            "overspeed_summary",
+
+        "vehicle":
+            intent.vehicle_id,
+
+        "overspeed":
+            processed["analytics"]["overspeed"],
+
+        "daily_alerts":
+            processed["daily_alerts"],
+
+        "latest_alert":
+            processed["latest_alert"]
+    }
+
+
+
+def build_idling_summary_response(
+    intent,
+    processed
+):
+
+    return {
+
+        "type":
+            "idling_summary",
+
+        "vehicle":
+            intent.vehicle_id,
+
+        "idling":
+            processed["analytics"]["idling"],
+
+        "daily_alerts":
+            processed["daily_alerts"],
+
+        "latest_alert":
+            processed["latest_alert"]
+    }
+
+
+
+def build_afterhours_summary_response(
+    intent,
+    processed
+):
+
+    return {
+
+        "type":
+            "afterhours_summary",
+
+        "vehicle":
+            intent.vehicle_id,
+
+        "afterhoursmovement":
+            processed["analytics"]["afterhoursmovement"],
+
+        "daily_alerts":
+            processed["daily_alerts"],
+
+        "latest_alert":
+            processed["latest_alert"]
     }
 
 
@@ -517,7 +512,39 @@ def build_alert_response(intent, api_result):
             intent,
             processed
         )
+    
+    # =====================================================
+    # OVERSPEED SUMMARY
+    # =====================================================
 
+    elif response_type == "overspeed_summary":
+
+        return build_overspeed_summary_response(
+            intent,
+            processed
+        )
+
+    # =====================================================
+    # IDLING SUMMARY
+    # =====================================================
+
+    elif response_type == "idling_summary":
+
+        return build_idling_summary_response(
+            intent,
+            processed
+        )
+
+    # =====================================================
+    # AFTER HOURS SUMMARY
+    # =====================================================
+
+    elif response_type == "afterhours_summary":
+
+        return build_afterhours_summary_response(
+            intent,
+            processed
+        )
     # =====================================================
     # DEFAULT FULL SUMMARY
     # =====================================================

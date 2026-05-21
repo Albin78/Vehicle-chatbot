@@ -50,6 +50,9 @@ def normalize_time_expression(query: str) -> str:
     query = re.sub(r"\bbetween\b", "", query)
     query = re.sub(r"\bfrom\b", "", query)
 
+    # Normalize shorthand
+    query = re.sub(r"\blst\b", "last", query)
+
     # Normalize connectors
     query = re.sub(
         r"\b(?:through|until|till)\b",
@@ -65,7 +68,6 @@ def normalize_time_expression(query: str) -> str:
     )
 
     # Remove ordinal suffixes
-    # 10th -> 10
     query = re.sub(
         r"(\d+)(st|nd|rd|th)",
         r"\1",
@@ -211,6 +213,7 @@ def is_time_range_in_query(
         r"\b(today|yesterday)\b",
 
         r"\blast\s+\d+\s+days\b",
+        r"\blst\s+\d+\s+days\b",
 
         r"\bthis\s+week\b",
         r"\blast\s+week\b",

@@ -16,6 +16,8 @@ ACTION_MAPPINGS = {
     "fetch": "fetch",
     "update": "update",
     "delete": "delete",
+    "Update": "update",
+    "Delete": "delete",
 
     # synonyms
     "check": "fetch",
@@ -66,15 +68,46 @@ def extract_aggregation(query: str):
 
 
 
-def normalize_action(action: Optional[str]) -> str:
+def normalize_action(
+    action: Optional[str],
+    query: str
+) -> str:
 
-    if not action:
-        return "fetch"
+    # =====================================
+    # 1. LLM ACTION
+    # =====================================
 
-    action = action.lower().strip()
+    if action:
 
-    return ACTION_MAPPINGS.get(action, "fetch")
+        normalized = ACTION_MAPPINGS.get(
+            action.lower().strip()
+        )
 
+        if normalized:
+            return normalized
+
+
+    q = query.lower()
+
+    update_keywords = [
+        "update",
+        "modify",
+        "edit",
+        "change"
+    ]
+
+    delete_keywords = [
+        "delete",
+        "remove"
+    ]
+
+    if any(word in q for word in update_keywords):
+        return "update"
+
+    if any(word in q for word in delete_keywords):
+        return "delete"
+
+    return "fetch"
 
 # =========================================================
 # SOURCE DETECTION
@@ -111,6 +144,27 @@ def detect_source(
 
     # metric-only queries default latest
     return "latest"
+
+
+
+def extract_alert_focus(query: str):
+
+    q = query.lower()
+
+    if "overspeed" in q:
+        return "overspeed"
+
+    if "idling" in q:
+        return "idling"
+
+    if (
+        "afterhours" in q
+        or "after-hours" in q
+        or "after hours" in q
+    ):
+        return "afterhoursmovement"
+
+    return None
 
 
 # =========================================================
@@ -214,8 +268,9 @@ def post_validate(
 
         if clean_data:
              clean_data["action"] = normalize_action(
-        clean_data.get("action")
-    )
+                clean_data.get("action"),
+                query
+            )
              
         vehicle_cache = get_vehicle_cache(company_id=16)
         vehicle_id = resolve_vehicle(query, vehicle_cache)
@@ -223,7 +278,7 @@ def post_validate(
         
         if vehicle_id:
             clean_data["vehicle_id"] = vehicle_id
-
+         
         extracted_metrics = extract_metrics(query)
 
         valid_metrics = []
@@ -237,7 +292,9 @@ def post_validate(
         
        
         clean_data["metrics"] = list(set(valid_metrics))
-
+        clean_data["alert_focus"] = (
+            extract_alert_focus(query)
+        )
 
         aggregation = extract_aggregation(query)
 
@@ -254,9 +311,38 @@ def post_validate(
 
         if source == "alert":
 
-            clean_data["alert_response_type"] = (
-                extract_alert_response_type(query)
+            alert_focus = clean_data.get(
+                "alert_focus"
             )
+
+            # -------------------------------------
+            # Focused alert query
+            # -------------------------------------
+
+            if alert_focus == "overspeed":
+
+                clean_data[
+                    "alert_response_type"
+                ] = "overspeed_summary"
+
+            elif alert_focus == "idling":
+
+                clean_data[
+                    "alert_response_type"
+                ] = "idling_summary"
+
+            elif alert_focus == "afterhoursmovement":
+
+                clean_data[
+                    "alert_response_type"
+                ] = "afterhours_summary"
+
+            else:
+
+                clean_data[
+                    "alert_response_type"
+                ] = extract_alert_response_type(query)
+
 
         # =========================================
         # SUMMARY REQUESTED
@@ -266,10 +352,6 @@ def post_validate(
             detect_summary_requested(query)
         )
 
-        # =========================================
-        # RULE:
-        # current status => all latest fields
-        # =========================================
 
         if clean_data["summary_requested"]:
             clean_data["metrics"] = []

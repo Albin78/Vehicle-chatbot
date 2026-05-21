@@ -222,6 +222,7 @@ SPECIAL_METRICS = {
     "door_open",
     "camera_status",
     "remote_immobilization",
+    "location",
 }
 
 
@@ -289,6 +290,10 @@ def format_metric(metric, value):
 # REALTIME METRIC FORMATTER
 # =========================================================
 
+# =========================================================
+# REALTIME METRIC FORMATTER
+# =========================================================
+
 def format_realtime_metric(result):
 
     vehicle = result.get("vehicle")
@@ -299,6 +304,8 @@ def format_realtime_metric(result):
     )
 
     parts = []
+
+    unavailable_metrics = []
 
     # -----------------------------------------------------
     # METRICS
@@ -311,11 +318,81 @@ def format_realtime_metric(result):
             value
         )
 
+        # -------------------------------------------------
+        # VALID METRIC
+        # -------------------------------------------------
+
         if formatted:
+
             parts.append(formatted)
+
+        # -------------------------------------------------
+        # UNAVAILABLE METRIC
+        # -------------------------------------------------
+
+        else:
+
+            readable_metric = (
+                metric.replace("_", " ")
+            )
+
+            unavailable_metrics.append(
+                readable_metric
+            )
+
+    # -----------------------------------------------------
+    # NO VALID METRICS
+    # -----------------------------------------------------
+
+    if not parts:
+
+        # -------------------------------------------------
+        # SINGLE UNAVAILABLE
+        # -------------------------------------------------
+
+        if len(unavailable_metrics) == 1:
+
+            metric_name = (
+                unavailable_metrics[0]
+                .capitalize()
+            )
+
+            return (
+                f"{metric_name} data is currently "
+                f"unavailable for vehicle "
+                f"{vehicle}."
+            )
+
+        # -------------------------------------------------
+        # MULTIPLE UNAVAILABLE
+        # -------------------------------------------------
+
+        if unavailable_metrics:
+
+            metrics_text = ", ".join(
+                unavailable_metrics
+            )
+
+            return (
+                f"The following realtime metrics "
+                f"are currently unavailable for "
+                f"vehicle {vehicle}: "
+                f"{metrics_text}."
+            )
+
+        # -------------------------------------------------
+        # EMPTY
+        # -------------------------------------------------
+
+        return (
+            f"No realtime telemetry data "
+            f"is currently available "
+            f"for vehicle {vehicle}."
+        )
 
     # -----------------------------------------------------
     # LAST UPDATED
+    # ONLY IF VALID METRICS EXIST
     # -----------------------------------------------------
 
     last_updated = result.get(
@@ -329,18 +406,6 @@ def format_realtime_metric(result):
         )
 
     # -----------------------------------------------------
-    # EMPTY RESPONSE
-    # -----------------------------------------------------
-
-    if not parts:
-
-        return (
-            f"No realtime telemetry data "
-            f"is currently available "
-            f"for vehicle {vehicle}"
-        )
-
-    # -----------------------------------------------------
     # FINAL RESPONSE
     # -----------------------------------------------------
 
@@ -349,7 +414,6 @@ def format_realtime_metric(result):
         + ". ".join(parts)
         + "."
     )
-
 
 # =========================================================
 # REALTIME STATUS FORMATTER

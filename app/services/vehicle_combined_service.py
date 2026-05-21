@@ -56,7 +56,7 @@ def handle_vehicle_service(
 
     result = combined_report(**payload)
 
-    logger.info(f"[SERVICE] API Result: {result}")
+    # logger.info(f"[SERVICE] API Result: {result}")
 
     # --------------------------------------------------
     # VALIDATION

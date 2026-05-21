@@ -29,12 +29,19 @@ def clean_value(value: Any):
 
     if isinstance(value, dict):
 
-        text = value.get("text")
+        # If dict has a "text" key, validate it
+        if "text" in value:
+            text = value.get("text")
 
-        if text in INVALID_VALUES:
-            return None
+            if text in INVALID_VALUES:
+                return None
 
-        return value
+        # Return dict as-is if it has content
+        # (could be location, camera_status, etc.)
+        if value:
+            return value
+
+        return None
 
     # -----------------------------------------
     # NORMAL VALUES
