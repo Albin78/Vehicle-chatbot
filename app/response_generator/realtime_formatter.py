@@ -124,7 +124,7 @@ FIELD_FORMATTERS = {
 
     "odometer_reading":
         lambda v:
-            f"Odometer reading is {v}",
+            f"Odometer reading is {v} km",
 
     # -----------------------------------------------------
     # ENGINE

@@ -2,6 +2,11 @@ from app.parsers.date_parser import (
     format_time_generate
 )
 from app.utils.response_utils import build_google_maps_url
+from app.utils.logger import logger
+
+from app.response_generator.overspeed_formatter import format_overspeed_summary
+from app.response_generator.idling_formatter import format_idling_summary
+from app.response_generator.afterhours_formatter import format_afterhours_summary
 
 def build_distribution_text(
     distribution: dict
@@ -62,9 +67,15 @@ def safe_format_date(
     if not value:
         return ""
 
-    formatted = format_time_generate(value)
+    try:
 
-    return formatted or str(value)
+        formatted = format_time_generate(value)
+
+        return formatted or str(value)
+
+    except Exception:
+
+        return str(value)
 
 
 # =========================================================
@@ -644,192 +655,7 @@ def format_full_alert_summary(
     return ". ".join(insights) + "."
 
 
-def format_overspeed_summary(
-    result,
-    intent
-):
-
-    try:
-
-        overspeed = (
-            result.get("overspeed")
-            or {}
-        )
-
-        count = overspeed.get(
-            "count",
-            0
-        )
-
-        insights = [
-
-            f"{count} overspeed alerts "
-            f"were detected for vehicle "
-            f"{intent.vehicle_id}"
-        ]
-
-        highest = (
-            overspeed.get("highest")
-            or {}
-        )
-
-        if highest:
-
-            highest_parts = []
-
-            speed = highest.get("speed")
-
-            if speed:
-
-                highest_parts.append(
-                    f"highest speed reached "
-                    f"{str(speed)}"
-                )
-
-            limit = highest.get("limit")
-
-            if limit:
-
-                highest_parts.append(
-                    f"against limit "
-                    f"{str(limit)}"
-                )
-
-            event_time = highest.get("time")
-
-            if event_time:
-
-                highest_parts.append(
-                    f"on "
-                    f"{safe_format_date(event_time)}"
-                )
-
-            duration = highest.get(
-                "duration"
-            )
-
-            if duration:
-
-                highest_parts.append(
-                    f"lasting "
-                    f"{str(duration)}"
-                )
-
-            # =========================
-            # SAFE LOCATION HANDLING
-            # =========================
-
-            location = highest.get(
-                "location"
-            )
-
-            if location:
-
-                try:
-
-                    google_maps_url = (
-                        build_google_maps_url(
-                            str(location)
-                        )
-                    )
-
-                    if google_maps_url:
-
-                        highest_parts.append(
-                            f"location: "
-                            f"{google_maps_url}"
-                        )
-
-                except Exception:
-                    pass
-
-            # =========================
-            # FINAL APPEND
-            # =========================
-
-            if highest_parts:
-
-                insights.append(
-                    "Highest overspeed event: "
-                    + ", ".join(
-                        map(str, highest_parts)
-                    )
-                )
-
-        return ". ".join(insights) + "."
-
-    except Exception as e:
-
-        return (
-            f"Unable to format "
-            f"overspeed summary: {str(e)}"
-        )
-
-
-
-def format_idling_summary(
-    result,
-    intent
-):
-
-    idling = result.get(
-        "idling",
-        {}
-    )
-
-    count = idling.get(
-        "count",
-        0
-    )
-
-    insights = []
-
-    insights.append(
-        f"{count} idling alerts "
-        f"were detected for vehicle "
-        f"{intent.vehicle_id}"
-    )
-
-    longest = idling.get(
-        "longest"
-    )
-
-    if longest:
-
-        parts = []
-
-        if longest.get("duration"):
-
-            parts.append(
-                f"longest idle duration "
-                f"was "
-                f"{longest.get('duration')}"
-            )
-
-        if longest.get("time"):
-
-            parts.append(
-                f"on "
-                f"{safe_format_date(longest.get('time'))}"
-            )
-
-        google_maps_url = build_google_maps_url(
-            longest.get("location")
-        )
-
-        if google_maps_url:
-
-            parts.append(
-                f"location: "
-                f"{google_maps_url}"
-            )
-
-        insights.append(
-            "Longest idling event: "
-            + ", ".join(parts)
-        )
-
-    return ". ".join(insights) + "."
+# Detailed summary formatters have been moved to separate module files for improved readability.
 
 
 
@@ -843,6 +669,7 @@ def format_alert(
 ):
 
     result_type = result.get("type")
+    # logger.info(f"The alert section data: {result}")
 
     # =====================================================
     # ERROR
@@ -917,6 +744,17 @@ def format_alert(
     if result_type == "idling_summary":
 
         return format_idling_summary(
+            result,
+            intent
+        )
+
+    # =====================================================
+    # AFTER HOURS SUMMARY
+    # =====================================================
+
+    if result_type == "afterhours_summary":
+
+        return format_afterhours_summary(
             result,
             intent
         )

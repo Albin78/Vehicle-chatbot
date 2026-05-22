@@ -18,7 +18,14 @@ def build_user_message(result, intent):
     ]:
         return format_realtime(result, intent)
 
-    if result_type.startswith("alert"):
+    if (
+        result_type.startswith("alert")
+        or result_type in [
+            "overspeed_summary",
+            "idling_summary",
+            "afterhours_summary"
+        ]
+    ):
         return format_alert(result, intent)
 
     if result_type in [
