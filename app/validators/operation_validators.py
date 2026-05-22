@@ -249,10 +249,31 @@ def detect_summary_requested(query: str):
         "vehicle status",
         "latest status",
         "complete status",
-        "full status"
+        "full status",
+        "overall status"
     ]
 
-    return any(p in q for p in phrases)
+    if not any(p in q for p in phrases):
+        return False
+
+    # If a specific metric qualifier precedes "status",
+    # do NOT treat it as a full status request.
+    metric_qualifiers = [
+        "speed status",
+        "fuel status",
+        "engine status",
+        "battery status",
+        "ignition status",
+        "door status",
+        "seatbelt status",
+        "camera status",
+        "movement status"
+    ]
+
+    if any(m in q for m in metric_qualifiers):
+        return False
+
+    return True
 
 
 # =========================================================

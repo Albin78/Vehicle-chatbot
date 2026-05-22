@@ -93,6 +93,13 @@ METRIC_SYNONYMS = {
     "vehicle speed": "speed",
     "running speed": "speed",
     "live speed": "speed",
+    "speed status": "speed",
+    "moving": "speed",
+    "is moving": "speed",
+    "currently moving": "speed",
+    "is it moving": "speed",
+    "vehicle moving": "speed",
+    "movement status": "speed",
 
     "fuel": "fuel_level",
     "fuel level": "fuel_level",
