@@ -300,12 +300,6 @@ STOPWORDS = {
 def normalize_vehicle_id(value: str) -> str:
     """
     Normalize all vehicle IDs into canonical form.
-
-    Examples:
-        1834 RXB   -> 1834RXB
-        RXB 1834   -> 1834RXB
-        97 J J J   -> 97JJJ
-        53380 533  -> 53380533
     """
 
     if not value:
