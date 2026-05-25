@@ -16,7 +16,10 @@ DEFAULT_INTENT = {
     "alert_analysis": None,
     "alert_focus": None,
     "time_range": None,
-    "summary_requested": False
+    "summary_requested": False,
+    "alert_enable_check": False,
+    "alert_type_focus": None,
+    "alert_time_range_default": False
 }
 
 
@@ -264,6 +267,15 @@ def sanitize_llm_output(raw: str) -> dict:
                     ""
                 }:
                     value = None
+
+            # ---------------------------------------------------
+            # BOOLEAN GUARD
+            # If the LLM omitted the field (value is None) but
+            # DEFAULT_INTENT declares it as a bool, restore the
+            # default so Pydantic doesn't reject None for bool.
+            # ---------------------------------------------------
+            if value is None and isinstance(DEFAULT_INTENT.get(key), bool):
+                value = DEFAULT_INTENT[key]
 
             cleaned[key] = value
 

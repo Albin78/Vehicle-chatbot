@@ -3,6 +3,7 @@
 from app.response_generator.realtime_formatter import format_realtime
 from app.response_generator.alert_formatter import format_alert
 from app.response_generator.summary_formatter import format_summary
+from app.response_generator.alert_enable_formatter import format_alert_enable
 from app.utils.logger import logger
 
 
@@ -26,6 +27,12 @@ def build_user_message(result, intent):
             "afterhours_summary"
         ]
     ):
+        if result_type in [
+            "alert_enable_single",
+            "alert_enable_all"
+        ]:
+            return format_alert_enable(result, intent)
+
         return format_alert(result, intent)
 
     if result_type in [

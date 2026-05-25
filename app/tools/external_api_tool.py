@@ -145,3 +145,68 @@ def combined_report(
         logger.exception("Unexpected Error")
         return {"response": "Some internal error happened"}
     
+
+
+# =========================================================
+# ALERT ENABLE STATUS API
+# =========================================================
+
+def get_alert_enable_status(
+    company_id: int,
+    vehicle_id: int | None = None,
+    row: int = 100,
+    page: int = 1
+):
+    try:
+        if not company_id:
+            return {"response": "Company ID is required"}
+
+        headers = {
+            "Authorization": f"Bearer {AUTH_TOKEN}",
+            "Accept": "*/*",
+            "User-Agent": "MyUserAgent"
+        }
+
+        url = "https://api.girfalco.sa/v2/alertV2/enable"
+
+        params = {
+            "cid": company_id,
+            "row": row,
+            "page": page,
+            "vgid": "",
+            "TypeID": 1
+        }
+
+        logger.info(
+            f"Calling Alert Enable Status API: cid={company_id}"
+        )
+
+        response = requests.get(
+            url,
+            headers=headers,
+            params=params,
+            timeout=10
+        )
+
+        logger.info(f"Alert Enable API status code: {response.status_code}")
+
+        if response.status_code != 200:
+            logger.error(f"HTTP Error: {response.status_code}")
+            return {"response": "Unable to fetch alert enable status"}
+
+        data = response.json()
+        return data
+
+    except requests.exceptions.Timeout:
+        logger.exception("Timeout Error")
+        return {"response": "Request timed out"}
+
+    except requests.exceptions.ConnectionError:
+        logger.exception("Connection Error")
+        return {"response": "Unable to connect to alert enable service"}
+
+    except Exception:
+        logger.exception("Unexpected Error")
+        return {"response": "Some internal error happened"}
+
+    

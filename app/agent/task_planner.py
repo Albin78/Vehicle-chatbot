@@ -14,7 +14,8 @@ def create_plan(
     if intent.source in {
         "latest",
         "summary",
-        "alert"
+        "alert",
+        "alert_enable"
     }:
 
         return ExecutionPlan(

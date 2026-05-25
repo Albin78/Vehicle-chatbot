@@ -2,6 +2,10 @@ from app.services.vehicle_combined_service import (
     handle_vehicle_service
 )
 
+from app.services.alert_enable_service import (
+    handle_alert_enable_service
+)
+
 from app.tools.db_tool import fetch_telemetry
 from app.tools.analytics_tool import run_analytics
 
@@ -41,6 +45,13 @@ def route_tool(intent, plan, company_id):
     # --------------------------------------------------
 
     if plan.tool == "external_api":
+
+        if intent.source == "alert_enable":
+            return handle_alert_enable_service(
+                intent=intent,
+                plan=plan,
+                company_id=company_id
+            )
 
         return handle_vehicle_service(
             intent=intent,

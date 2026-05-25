@@ -106,7 +106,8 @@ def validate_intent(intent):
     valid_sources = {
         "latest",
         "summary",
-        "alert"
+        "alert",
+        "alert_enable"
     }
 
     if intent.source not in valid_sources:

@@ -660,6 +660,42 @@ def format_full_alert_summary(
 
 
 # =========================================================
+# TIME RANGE CONTEXT LINE
+# =========================================================
+
+def build_time_range_context(intent) -> str:
+    """
+    Returns a human-readable period line when the time range was
+    auto-filled (not explicitly given by the user).
+    e.g. "Data covers today (2026-05-25)."
+         "Data covers the last 7 days (2026-05-18 to 2026-05-25)."
+    """
+
+    if not getattr(intent, "alert_time_range_default", False):
+        return ""
+
+    time_range = getattr(intent, "time_range", None)
+    if not time_range or len(time_range) != 2:
+        return ""
+
+    from_date, to_date = time_range
+
+    if from_date == to_date:
+        return f"Data covers today ({to_date})"
+
+    try:
+        from datetime import datetime
+        dt_from = datetime.strptime(from_date, "%Y-%m-%d")
+        dt_to = datetime.strptime(to_date, "%Y-%m-%d")
+        days = (dt_to - dt_from).days
+        if days == 1:
+            return f"Data covers the last day ({from_date} to {to_date})"
+        return f"Data covers the last {days} days ({from_date} to {to_date})"
+    except Exception:
+        return f"Data covers the period from {from_date} to {to_date}"
+
+
+# =========================================================
 # MAIN ROUTER
 # =========================================================
 
@@ -669,98 +705,35 @@ def format_alert(
 ):
 
     result_type = result.get("type")
-    # logger.info(f"The alert section data: {result}")
 
-    # =====================================================
     # ERROR
-    # =====================================================
-
     if result_type == "error":
-
         return result.get(
             "message",
             "Unable to process alert data."
         )
 
-    # =====================================================
-    # ALERT COUNT
-    # =====================================================
-
+    # Dispatch to specific formatter to get base message
     if result_type == "alert_count":
+        base_msg = format_alert_count(result, intent)
+    elif result_type == "latest_alert":
+        base_msg = format_latest_alert(result, intent)
+    elif result_type == "daily_alert_summary":
+        base_msg = format_daily_alert_summary(result, intent)
+    elif result_type == "alert_summary":
+        base_msg = format_full_alert_summary(result, intent)
+    elif result_type == "overspeed_summary":
+        base_msg = format_overspeed_summary(result, intent)
+    elif result_type == "idling_summary":
+        base_msg = format_idling_summary(result, intent)
+    elif result_type == "afterhours_summary":
+        base_msg = format_afterhours_summary(result, intent)
+    else:
+        return "Unable to format alert response."
 
-        return format_alert_count(
-            result,
-            intent
-        )
+    # Prepend time range context if applicable
+    context_line = build_time_range_context(intent)
+    if context_line:
+        return f"{context_line}. {base_msg}"
 
-    # =====================================================
-    # LATEST ALERT
-    # =====================================================
-
-    if result_type == "latest_alert":
-
-        return format_latest_alert(
-            result,
-            intent
-        )
-
-    # =====================================================
-    # DAILY ALERT SUMMARY
-    # =====================================================
-
-    if result_type == "daily_alert_summary":
-
-        return format_daily_alert_summary(
-            result,
-            intent
-        )
-
-    # =====================================================
-    # FULL ALERT SUMMARY
-    # =====================================================
-
-    if result_type == "alert_summary":
-
-        return format_full_alert_summary(
-            result,
-            intent
-        )
-    
-    # =====================================================
-    # OVERSPEED SUMMARY
-    # =====================================================
-
-    if result_type == "overspeed_summary":
-
-        return format_overspeed_summary(
-            result,
-            intent
-        )
-
-    # =====================================================
-    # IDLING SUMMARY
-    # =====================================================
-
-    if result_type == "idling_summary":
-
-        return format_idling_summary(
-            result,
-            intent
-        )
-
-    # =====================================================
-    # AFTER HOURS SUMMARY
-    # =====================================================
-
-    if result_type == "afterhours_summary":
-
-        return format_afterhours_summary(
-            result,
-            intent
-        )
-    
-    # =====================================================
-    # FALLBACK
-    # =====================================================
-
-    return "Unable to format alert response."
+    return base_msg

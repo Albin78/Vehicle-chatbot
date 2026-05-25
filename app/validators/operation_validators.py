@@ -8,7 +8,7 @@ from .intent_validator import (
 )
 
 from app.tools.vehicle_cache import get_vehicle_cache
-
+from datetime import datetime, timedelta, timezone
 
 ACTION_MAPPINGS = {
 
@@ -110,6 +110,139 @@ def normalize_action(
     return "fetch"
 
 # =========================================================
+# ALERT ENABLE / DISABLE DETECTION
+# =========================================================
+
+ALERT_ENABLE_KEYWORDS = [
+    "enabled",
+    "disabled",
+    "is enabled",
+    "is disabled",
+    "alert enabled",
+    "alert disabled",
+    "enable alert",
+    "disable alert",
+    "turned on",
+    "turned off",
+    "alert on",
+    "alert off",
+    "which alerts",
+    "what alerts",
+    "alerts enabled",
+    "alerts disabled",
+    "alert settings",
+    "alert configuration"
+]
+
+
+ALERT_TYPE_SYNONYMS = {
+    "overspeed": "overSpeed",
+    "over speed": "overSpeed",
+    "speed alert": "overSpeed",
+    "idling": "idling",
+    "idle": "idling",
+    "overstay": "overStay",
+    "over stay": "overStay",
+    "battery disconnection": "batteryDisconnection",
+    "battery disconnect": "batteryDisconnection",
+    "low battery": "lowBattery",
+    "rash driving": "rashDriving",
+    "harsh driving": "rashDriving",
+    "continuous": "continuous",
+    "territory": "territory",
+    "geofence": "territory",
+    "refuel drain": "refuelDrain",
+    "fuel drain": "refuelDrain",
+    "fuel disconnection": "fuelDisconnection",
+    "parkfence": "parkfence",
+    "park fence": "parkfence",
+    "overload": "overload",
+    "weight tamper": "WeightTamper",
+    "accident": "Accident",
+    "seatbelt": "seatbelt",
+    "seat belt": "seatbelt",
+    "asset movement": "assetmovement",
+    "asset move": "assetmovement",
+    "territory overspeed": "territoryOverSpeed",
+    "territory speed": "territoryOverSpeed",
+    "safe stop fuel drainer": "safeStopFuelDrainer",
+    "equipment bypass": "equipmentByPass",
+    "after hours movement": "afterhoursmovement",
+    "afterhours movement": "afterhoursmovement",
+    "afterhours": "afterhoursmovement",
+    "after hours": "afterhoursmovement",
+    "zone based speed limit": "zoneBasedSpeedLimit",
+    "zone speed": "zoneBasedSpeedLimit",
+}
+
+
+def detect_alert_enable_query(query: str) -> bool:
+
+    q = query.lower()
+
+    return any(
+        kw in q for kw in ALERT_ENABLE_KEYWORDS
+    )
+
+
+def extract_alert_type_focus(query: str) -> str | None:
+
+    q = query.lower()
+
+    for phrase, canonical in ALERT_TYPE_SYNONYMS.items():
+
+        if phrase in q:
+            return canonical
+
+    return None
+
+
+# =========================================================
+# DEFAULT ALERT TIME RANGE
+# =========================================================
+
+def get_today_str() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def apply_default_alert_time_range(query: str, clean_data: dict) -> bool:
+    """
+    Fills clean_data["time_range"] with a sensible default when the user
+    did not specify one, and returns True to signal a default was applied.
+
+    Rules:
+      - "latest <alert-type>" / "recent" / "last alert"  → today only
+      - Any other alert query without a time_range        → last 7 days
+    """
+
+    if clean_data.get("time_range"):
+        return False
+
+    q = query.lower()
+
+    today = get_today_str()
+
+    latest_hints = [
+        "latest",
+        "recent",
+        "last alert",
+        "most recent",
+        "newest",
+    ]
+
+    if any(hint in q for hint in latest_hints):
+        clean_data["time_range"] = (today, today)
+        return True
+
+    seven_days_ago = (
+        datetime.now(timezone.utc) - timedelta(days=7)
+    ).strftime("%Y-%m-%d")
+
+    clean_data["time_range"] = (seven_days_ago, today)
+    return True
+
+
+# =========================================================
 # SOURCE DETECTION
 # =========================================================
 
@@ -120,6 +253,10 @@ def detect_source(
 ):
 
     q = query.lower()
+
+    # ALERT ENABLE / DISABLE CHECK
+    if detect_alert_enable_query(q):
+        return "alert_enable"
 
     # ALERT
     if any(word in q for word in [
@@ -364,6 +501,25 @@ def post_validate(
                     "alert_response_type"
                 ] = extract_alert_response_type(query)
 
+            # Apply time range defaulting for alerts
+            defaulted = apply_default_alert_time_range(
+                query, clean_data
+            )
+            clean_data["alert_time_range_default"] = defaulted
+
+        # =========================================
+        # ALERT ENABLE / DISABLE CHECK
+        # =========================================
+
+        if source == "alert_enable":
+
+            clean_data["alert_enable_check"] = True
+
+            clean_data["alert_type_focus"] = (
+                extract_alert_type_focus(query)
+            )
+
+            clean_data["metrics"] = []
 
         # =========================================
         # SUMMARY REQUESTED

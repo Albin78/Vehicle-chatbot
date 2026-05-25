@@ -10,6 +10,10 @@ from app.builders.summary_builder import (
     build_summary_response
 )
 
+from app.builders.alert_enable_builder import (
+    build_alert_enable_response
+)
+
 
 def build_response(intent, api_result):
 
@@ -30,6 +34,13 @@ def build_response(intent, api_result):
     if intent.source == "summary":
 
         return build_summary_response(
+            intent,
+            api_result
+        )
+
+    if intent.source == "alert_enable":
+
+        return build_alert_enable_response(
             intent,
             api_result
         )

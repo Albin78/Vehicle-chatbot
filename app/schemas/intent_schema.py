@@ -53,7 +53,16 @@ class QueryIntent(BaseModel):
 
     alert_response_type: str = ""
     
-    summary_requested: bool = False 
+    summary_requested: bool = False
+
+    # ---------------------------------
+    # ALERT ENABLE / DISABLE CHECK
+    # ---------------------------------
+    alert_enable_check: bool = False
+
+    alert_type_focus: Optional[str] = None
+
+    alert_time_range_default: bool = False 
 
 
 
@@ -142,5 +151,10 @@ class QueryIntent(BaseModel):
         # summary_requested only for latest
         if self.source != "latest":
             self.summary_requested = False
+
+        # alert_enable_check and alert_type_focus only for alert_enable
+        if self.source != "alert_enable":
+            self.alert_enable_check = False
+            self.alert_type_focus = None
 
         return self
