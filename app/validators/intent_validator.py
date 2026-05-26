@@ -537,11 +537,16 @@ def extract_metrics(query: str) -> list[str]:
 
     found = set()
 
+    # Sort synonyms by length in descending order to match longer/more specific phrases first
+    sorted_synonyms = sorted(METRIC_SYNONYMS.items(), key=lambda x: len(x[0]), reverse=True)
+
     # phrase priority
-    for phrase, metric in METRIC_SYNONYMS.items():
+    for phrase, metric in sorted_synonyms:
 
         if phrase in q:
             found.add(metric)
+            # Mask the matched phrase in q to prevent sub-phrases from matching
+            q = q.replace(phrase, " " * len(phrase))
 
     # direct metrics
     for metric in VALID_METRICS:
