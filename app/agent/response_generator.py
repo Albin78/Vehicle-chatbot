@@ -58,7 +58,7 @@ def generate_response(result, intent):
             "STRUCTURE RULES:\n"
             "1. Start with a brief, professional introductory sentence stating the vehicle ID, type, current status (stopped/moving), and the assigned group.\n"
             "2. Present the detailed status parameters as four clean, easy-to-read single-line bullet points exactly in this format:\n"
-            "   * **Specifications**: Manufactured by [Make], [Model] model, classified as [tanker/can], with IMEI [IMEI], and Camera IMEI [Camera IMEI]\n"
+            "   * **Specifications**: Manufactured by [Make], [Model] model, classified as [tanker/can], with IMEI for device [IMEI], and Camera IMEI [Camera IMEI]\n"
             "   * **Connectivity & Power**: [GSM signal status with value], and battery voltage is [Battery voltage]\n"
             "   * **Fuel & Tanks**: Fuel level is [Fuel level] of [Fuel capacity] capacity, and tanker fuel level is [Tanker fuel level] of [Tanker capacity] capacity\n"
             "   * **Safety & Security**: Ignition is [Ignition status], seatbelt is [Seatbelt status], and remote immobilization is [Immobilization status]\n"
