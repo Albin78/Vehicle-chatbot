@@ -22,7 +22,8 @@ class QueryIntent(BaseModel):
         Literal[
             "latest",
             "summary",
-            "alert"
+            "alert",
+            "alert_enable"
         ]
     ] = None
 
@@ -63,6 +64,10 @@ class QueryIntent(BaseModel):
     alert_type_focus: Optional[str] = None
 
     alert_time_range_default: bool = False 
+
+    summary_time_range_default: bool = False
+
+    query: Optional[str] = None
 
 
 

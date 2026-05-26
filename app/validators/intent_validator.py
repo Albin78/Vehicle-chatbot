@@ -77,6 +77,8 @@ VALID_METRICS = {
 
     "camera_status",
 
+    "camera_imei",
+
     "remote_immobilization",
 
     "driver_name",
@@ -85,7 +87,11 @@ VALID_METRICS = {
 
     "network",
 
-    "satellites"
+    "satellites",
+
+    "model_name",
+
+    "tanker_status"
 }
 
 
@@ -170,6 +176,8 @@ METRIC_SYNONYMS = {
     "seatbelt": "seatbelt",
     "seat belt": "seatbelt",
     "seatbelt status": "seatbelt",
+    "seatbel": "seatbelt",
+    "seatbel status": "seatbelt",
 
     "door": "door_open",
     "door status": "door_open",
@@ -177,6 +185,9 @@ METRIC_SYNONYMS = {
 
     "camera": "camera_status",
     "camera status": "camera_status",
+    "camera imei": "camera_imei",
+    "cameraimei": "camera_imei",
+    "camera imei status": "camera_imei",
 
     "location": "location",
     "current location": "location",
@@ -189,6 +200,19 @@ METRIC_SYNONYMS = {
 
     "make": "make",
     "manufacturer": "make",
+
+    "model": "model_name",
+    "model name": "model_name",
+    "vehicle model": "model_name",
+    "modelname": "model_name",
+
+    "tanker": "tanker_status",
+    "can": "tanker_status",
+    "tanker status": "tanker_status",
+    "tanker or can": "tanker_status",
+    "tanker type": "tanker_status",
+    "tanker equipment number": "tanker_status",
+    "tankerequipmentnumber": "tanker_status",
 
     "last updated": "last_updated",
     "updated time": "last_updated",

@@ -485,7 +485,7 @@ def build_alert_response(intent, api_result):
 
     if response_type == "alert_count":
 
-        return build_alert_count_response(
+        res_dict = build_alert_count_response(
             intent,
             alerts,
             processed
@@ -497,7 +497,7 @@ def build_alert_response(intent, api_result):
 
     elif response_type == "latest_alert":
 
-        return build_latest_alert_response(
+        res_dict = build_latest_alert_response(
             intent,
             processed
         )
@@ -508,7 +508,7 @@ def build_alert_response(intent, api_result):
 
     elif response_type == "daily_alert_summary":
 
-        return build_daily_alert_summary_response(
+        res_dict = build_daily_alert_summary_response(
             intent,
             processed
         )
@@ -519,7 +519,7 @@ def build_alert_response(intent, api_result):
 
     elif response_type == "overspeed_summary":
 
-        return build_overspeed_summary_response(
+        res_dict = build_overspeed_summary_response(
             intent,
             processed
         )
@@ -530,7 +530,7 @@ def build_alert_response(intent, api_result):
 
     elif response_type == "idling_summary":
 
-        return build_idling_summary_response(
+        res_dict = build_idling_summary_response(
             intent,
             processed
         )
@@ -541,7 +541,7 @@ def build_alert_response(intent, api_result):
 
     elif response_type == "afterhours_summary":
 
-        return build_afterhours_summary_response(
+        res_dict = build_afterhours_summary_response(
             intent,
             processed
         )
@@ -549,8 +549,17 @@ def build_alert_response(intent, api_result):
     # DEFAULT FULL SUMMARY
     # =====================================================
 
-    return build_full_alert_summary_response(
-        intent,
-        alerts,
-        processed
-    )
+    else:
+        res_dict = build_full_alert_summary_response(
+            intent,
+            alerts,
+            processed
+        )
+
+    # Merge dynamic backoff metadata if present
+    if "backoff_applied" in api_result:
+        res_dict["backoff_applied"] = api_result["backoff_applied"]
+        res_dict["backoff_original_range"] = api_result.get("backoff_original_range")
+        res_dict["backoff_used_range"] = api_result.get("backoff_used_range")
+
+    return res_dict

@@ -1,6 +1,6 @@
 import re
 from typing import Any
-
+from app.utils.logger import logger
 
 # =========================================================
 # DRIVER NAME CLEANER
@@ -516,6 +516,54 @@ def interpret_metric_value(
         }
 
     # =====================================================
+    # MODEL NAME
+    # =====================================================
+
+    if metric == "model_name":
+
+        return {
+            "available": True,
+            "text":
+                f"model is {value}"
+        }
+
+    # =====================================================
+    # TANKER STATUS
+    # =====================================================
+
+    if metric == "tanker_status":
+
+        return {
+            "available": True,
+            "text":
+                f"vehicle is a {value}"
+        }
+
+    # =====================================================
+    # GSM SIGNAL
+    # =====================================================
+
+    if metric == "gsm_signal":
+
+        if not isinstance(value, dict):
+            return unavailable_response(metric)
+
+        status = value.get("status", "unknown")
+        raw_val = value.get("value", 0)
+
+        if status == "no signal":
+            return {
+                "available": True,
+                "text": f"device has no GSM signal with value of {raw_val}"
+            }
+
+        logger.info(f"[Metric formatter] GSM signal is {status} with value of {raw_val}")
+        return {
+            "available": True,
+            "text": f"GSM signal is {status} with value of {raw_val}"
+        }
+
+    # =====================================================
     # IMEI
     # =====================================================
 
@@ -525,6 +573,18 @@ def interpret_metric_value(
             "available": True,
             "text":
                 f"IMEI is {value}"
+        }
+
+    # =====================================================
+    # CAMERA IMEI
+    # =====================================================
+
+    if metric == "camera_imei":
+
+        return {
+            "available": True,
+            "text":
+                f"Camera IMEI is {value}"
         }
 
     # =====================================================

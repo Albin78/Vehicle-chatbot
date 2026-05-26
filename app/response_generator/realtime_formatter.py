@@ -106,6 +106,10 @@ FIELD_FORMATTERS = {
         lambda v:
             f"IMEI is {v}",
 
+    "camera_imei":
+        lambda v:
+            f"Camera IMEI is {v}",
+
     "wasl":
         lambda v:
             f"WASL identity number is {v}",
@@ -179,8 +183,11 @@ SUMMARY_FIELDS = [
 
     # Identity
     "imei",
+    "camera_imei",
     "vehicle_type",
     "make",
+    "model_name",
+    "tanker_status",
     "group_name",
     "driver_name",
 
@@ -223,6 +230,9 @@ SPECIAL_METRICS = {
     "camera_status",
     "remote_immobilization",
     "location",
+    "model_name",
+    "tanker_status",
+    "gsm_signal",
 }
 
 

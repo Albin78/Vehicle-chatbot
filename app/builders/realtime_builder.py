@@ -64,11 +64,13 @@ REALTIME_METRIC_MAP = {
 
     "network": "networkType",
 
-    "gsm_signal": "gsmSignal",
+    "gsm_signal": "GSMSignal",
 
     "satellites": "satellites",
 
     "camera_status": "cameraStatus",
+
+    "camera_imei": "CameraIMEI",
 
     "remote_immobilization": "RemoteImmobilaztion",
 
@@ -76,7 +78,11 @@ REALTIME_METRIC_MAP = {
 
     "longitude": "lon",
 
-    "last_updated": "lastRecordAt"
+    "last_updated": "lastRecordAt",
+
+    "model_name": "modelName",
+
+    "tanker_status": "TankerEquipmentNumber"
 }
 
 
@@ -130,6 +136,35 @@ def derive_vehicle_status(vehicle):
 
 
 # =========================================================
+# INTERPRET GSM SIGNAL
+# =========================================================
+
+def interpret_gsm_signal(vehicle) -> dict:
+
+    gsm_val = vehicle.get("GSMSignal")
+    if gsm_val is None:
+        gsm_val = vehicle.get("gsmSignal")
+
+    if gsm_val is None:
+        return {"status": "no signal", "value": 0}
+
+    try:
+        gsm_int = int(float(gsm_val))
+        if 3 <= gsm_int <= 5:
+            return {"status": "good", "value": gsm_int}
+        elif 0 < gsm_int < 3:
+            return {"status": "bad", "value": gsm_int}
+        elif gsm_int == 0:
+            return {"status": "no signal", "value": 0}
+        elif gsm_int > 5:
+            return {"status": "good", "value": gsm_int}
+        else:
+            return {"status": "no signal", "value": gsm_int}
+    except Exception:
+        return {"status": "unknown", "value": gsm_val}
+
+
+# =========================================================
 # BUILD METRIC RESPONSE
 # =========================================================
 
@@ -169,6 +204,34 @@ def build_metric_response(vehicle, metrics):
         if metric not in REALTIME_METRIC_MAP:
 
             invalid_metrics.append(metric)
+
+            continue
+
+        # =====================================================
+        # GSM SIGNAL
+        # =====================================================
+
+        if metric == "gsm_signal":
+
+            metric_values[metric] = interpret_gsm_signal(vehicle)
+
+            continue
+
+        # =====================================================
+        # TANKER STATUS
+        # =====================================================
+
+        if metric == "tanker_status":
+
+            tanker_val = vehicle.get("TankerEquipmentNumber")
+
+            is_tanker = False
+            if tanker_val is not None:
+                val_str = str(tanker_val).strip().upper()
+                if val_str not in ["", "NULL", "NONE", "NA", "N/A", "-", "--", "UNKNOWN"]:
+                    is_tanker = True
+
+            metric_values[metric] = "tanker" if is_tanker else "can"
 
             continue
 
@@ -335,6 +398,17 @@ def build_status_response(vehicle):
             vehicle.get("makeName")
         ),
 
+        "model_name": clean_value(
+            vehicle.get("modelName")
+        ),
+
+        "tanker_status": (
+            "tanker" if (
+                vehicle.get("TankerEquipmentNumber") is not None
+                and str(vehicle.get("TankerEquipmentNumber")).strip().upper() not in ["", "NULL", "NONE", "NA", "N/A", "-", "--", "UNKNOWN"]
+            ) else "can"
+        ),
+
         "ignition": clean_value(
             vehicle.get("ignitionOn")
         ),
@@ -355,9 +429,7 @@ def build_status_response(vehicle):
             vehicle.get("engineHours")
         ),
 
-        "gsm_signal": clean_value(
-            vehicle.get("gsmSignal")
-        ),
+        "gsm_signal": interpret_gsm_signal(vehicle),
 
         "network": clean_value(
             vehicle.get("networkType")
@@ -369,6 +441,10 @@ def build_status_response(vehicle):
 
         "camera_status": clean_value(
             vehicle.get("cameraStatus")
+        ),
+
+        "camera_imei": clean_value(
+            vehicle.get("CameraIMEI")
         ),
 
         "remote_immobilization": clean_value(

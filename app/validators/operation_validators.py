@@ -180,9 +180,13 @@ def detect_alert_enable_query(query: str) -> bool:
 
     q = query.lower()
 
-    return any(
-        kw in q for kw in ALERT_ENABLE_KEYWORDS
-    )
+    if not any(kw in q for kw in ALERT_ENABLE_KEYWORDS):
+        return False
+
+    has_alert_word = "alert" in q or "alerts" in q
+    has_alert_synonym = any(syn in q for syn in ALERT_TYPE_SYNONYMS)
+
+    return has_alert_word or has_alert_synonym
 
 
 def extract_alert_type_focus(query: str) -> str | None:
@@ -242,6 +246,19 @@ def apply_default_alert_time_range(query: str, clean_data: dict) -> bool:
     return True
 
 
+def apply_default_summary_time_range(query: str, clean_data: dict) -> bool:
+    if clean_data.get("time_range"):
+        return False
+
+    today = get_today_str()
+    seven_days_ago = (
+        datetime.now(timezone.utc) - timedelta(days=7)
+    ).strftime("%Y-%m-%d")
+
+    clean_data["time_range"] = (seven_days_ago, today)
+    return True
+
+
 # =========================================================
 # SOURCE DETECTION
 # =========================================================
@@ -267,7 +284,7 @@ def detect_source(
         return "alert"
 
     # SUMMARY
-    if aggregation or time_range:
+    if aggregation or time_range or "summary" in q or "report" in q:
         return "summary"
 
     # LATEST
@@ -507,6 +524,11 @@ def post_validate(
             )
             clean_data["alert_time_range_default"] = defaulted
 
+        if source == "summary":
+            # Apply time range defaulting for summaries if not specified
+            defaulted = apply_default_summary_time_range(query, clean_data)
+            clean_data["summary_time_range_default"] = defaulted
+
         # =========================================
         # ALERT ENABLE / DISABLE CHECK
         # =========================================
@@ -532,6 +554,8 @@ def post_validate(
 
         if clean_data["summary_requested"]:
             clean_data["metrics"] = []
+        
+        clean_data["query"] = query
         
         logger.info(f"Clean data from post validate: {clean_data}")
 

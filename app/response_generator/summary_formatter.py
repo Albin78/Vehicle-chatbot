@@ -1,7 +1,7 @@
 from app.parsers.date_parser import (
     format_time_generate
 )
-
+from app.utils.logger import logger
 
 # =========================================================
 # CONFIG
@@ -264,11 +264,7 @@ def build_daily_breakdown(daily_reports):
 
     parts = []
 
-    reports_to_show = daily_reports[
-        :MAX_DAILY_REPORTS
-    ]
-
-    for report in reports_to_show:
+    for report in daily_reports:
 
         report_date = safe_format_date(
             report.get("date")
@@ -287,23 +283,6 @@ def build_daily_breakdown(daily_reports):
             f"{report.get('idle_time')}, "
             f"and stop time was "
             f"{report.get('stop_time')}"
-
-        )
-
-    remaining = (
-
-        len(daily_reports)
-        - MAX_DAILY_REPORTS
-
-    )
-
-    if remaining > 0:
-
-        parts.append(
-
-            f"{remaining} additional "
-            f"daily reports were omitted "
-            f"for brevity"
 
         )
 
