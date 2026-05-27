@@ -436,29 +436,42 @@ def format_realtime_status(result):
     parts = []
 
     # -----------------------------------------------------
-    # STATUS + SPEED
+    # STATUS + SPEED + IGNITION
     # -----------------------------------------------------
 
     status = result.get("status")
-
     speed = result.get("speed")
+    ignition = result.get("ignition")
 
-    if has_value(status):
+    try:
+        ignition_val = int(ignition) if ignition is not None else None
+    except Exception:
+        try:
+            ignition_val = int(float(ignition)) if ignition is not None else None
+        except Exception:
+            ignition_val = None
 
-        if (
-            str(status).lower() == "moving"
-            and has_value(speed)
-        ):
+    try:
+        speed_val = float(speed) if speed is not None else 0.0
+    except Exception:
+        speed_val = 0.0
 
+    if speed_val > 0 or str(status).lower() == "moving":
+        parts.append(
+            f"Vehicle {vehicle} is currently moving at {speed} km/h"
+        )
+    else:
+        if ignition_val == 0:
             parts.append(
-                f"Vehicle {vehicle} is currently "
-                f"moving at {speed} km/h"
+                f"Vehicle {vehicle} is currently stopped with the engine off"
             )
-
-        else:
-
+        elif ignition_val == 1:
             parts.append(
-                f"Vehicle {vehicle} status is {status}"
+                f"Vehicle {vehicle} is currently stationary (not moving) but the ignition is on"
+            )
+        else:
+            parts.append(
+                f"Vehicle {vehicle} is currently stopped"
             )
 
     # -----------------------------------------------------

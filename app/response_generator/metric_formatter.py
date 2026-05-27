@@ -323,139 +323,101 @@ def interpret_metric_value(
     if metric == "camera_status":
 
         # ---------------------------------------------
-        # SIMPLE INTEGER / STRING STATUS
+        # PARSE INPUT DATA
         # ---------------------------------------------
 
-        if isinstance(value, (int, str)):
-
-            try:
-
-                status = int(value)
-
-            except Exception:
-
-                status = None
-
-            if status == 0:
-
-                return {
-                    "available": True,
-                    "text":
-                        "camera is not equipped"
-                }
-
-            if status == 1:
-
-                return {
-                    "available": True,
-                    "text":
-                        "camera is equipped"
-                }
-
-        # ---------------------------------------------
-        # STRUCTURED CAMERA OBJECT
-        # ---------------------------------------------
+        status = None
+        channels = None
 
         if isinstance(value, dict):
-
             status = value.get("status")
-
             channels = value.get("channels")
+        elif isinstance(value, (int, str)):
+            status = value
 
-            # -----------------------------------------
-            # NOT EQUIPPED
-            # -----------------------------------------
+        # ---------------------------------------------
+        # DETERMINE CHANNELS COUNT
+        # ---------------------------------------------
 
-            if status in [0, "0", False]:
+        count = 0
+        if isinstance(channels, list):
+            valid_channels = [ch for ch in channels if ch is not None]
+            count = len(valid_channels)
+        elif channels is not None:
+            try:
+                count = int(float(channels))
+            except Exception:
+                count = 0
 
+        # ---------------------------------------------
+        # CLASSIFY STATUS
+        # ---------------------------------------------
+
+        is_zero = False
+        is_one = False
+        is_invalid = False
+
+        if status in [0, "0", "0.0", False]:
+            is_zero = True
+        elif status in [1, "1", "1.0", True]:
+            is_one = True
+        elif is_invalid_value(status):
+            is_invalid = True
+        else:
+            status_str = str(status).strip().upper() if status is not None else ""
+            if status_str in ["0", "FALSE"]:
+                is_zero = True
+            elif status_str in ["1", "TRUE"]:
+                is_one = True
+            else:
+                is_invalid = True
+
+        # ---------------------------------------------
+        # INTERPRETATION RULES
+        # ---------------------------------------------
+
+        # Status 0 -> Equipped but not active
+        if is_zero:
+            if count == 1:
                 return {
                     "available": True,
-                    "text":
-                        "camera is not equipped"
+                    "text": "camera is equipped with 1 camera channel but not active"
                 }
-
-            # -----------------------------------------
-            # EQUIPPED
-            # -----------------------------------------
-
-            if status in [1, "1", True]:
-
-                # -------------------------------------
-                # LIST CHANNELS
-                # -------------------------------------
-
-                if isinstance(channels, list):
-
-                    valid_channels = [
-
-                        ch for ch in channels
-
-                        if ch is not None
-                    ]
-
-                    count = len(valid_channels)
-
-                    if count == 0:
-
-                        return {
-                            "available": True,
-                            "text":
-                                "camera is equipped"
-                        }
-
-                    if count == 1:
-
-                        return {
-                            "available": True,
-                            "text":
-                                (
-                                    "camera is equipped "
-                                    "with 1 camera channel"
-                                )
-                        }
-
-                    return {
-                        "available": True,
-                        "text":
-                            (
-                                "camera is equipped "
-                                f"with {count} camera channels"
-                            )
-                    }
-
-                # -------------------------------------
-                # INTEGER / DIGIT STRING
-                # -------------------------------------
-
-                if str(channels).isdigit() and channels:
-
-                    count = int(channels)
-
-                    if count == 1:
-
-                        return {
-                            "available": True,
-                            "text":
-                                (
-                                    "camera is equipped "
-                                    "with 1 camera channel"
-                                )
-                        }
-
-                    return {
-                        "available": True,
-                        "text":
-                            (
-                                "camera is equipped "
-                                f"with {count} camera channels"
-                            )
-                    }
-
+            elif count > 1:
                 return {
                     "available": True,
-                    "text":
-                        "camera is equipped"
+                    "text": f"camera is equipped with {count} camera channels but not active"
                 }
+            else:
+                return {
+                    "available": True,
+                    "text": "camera is equipped but not active"
+                }
+
+        # Status 1 -> Equipped and active
+        if is_one:
+            if count == 1:
+                return {
+                    "available": True,
+                    "text": "camera is equipped with 1 camera channel and is active"
+                }
+            elif count > 1:
+                return {
+                    "available": True,
+                    "text": f"camera is equipped with {count} camera channels and is active"
+                }
+            else:
+                return {
+                    "available": True,
+                    "text": "camera is equipped and is active"
+                }
+
+        # Null or invalid case -> Not equipped
+        if is_invalid:
+            return {
+                "available": True,
+                "text": "camera is not equipped"
+            }
 
         return unavailable_response(metric)
 

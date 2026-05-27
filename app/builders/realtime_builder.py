@@ -371,7 +371,7 @@ def build_status_response(vehicle):
         ),
 
         "odometer_reading": clean_value(
-            vehicle.get("odometerReading")
+            vehicle.get("odometerCurrentReading")
         ),
 
         "wasl": clean_value(
@@ -439,9 +439,10 @@ def build_status_response(vehicle):
             vehicle.get("satellites")
         ),
 
-        "camera_status": clean_value(
-            vehicle.get("cameraStatus")
-        ),
+        "camera_status": {
+            "status": vehicle.get("CameraStatus"),
+            "channels": vehicle.get("CameraChannel")
+        },
 
         "camera_imei": clean_value(
             vehicle.get("CameraIMEI")

@@ -73,20 +73,6 @@ def normalize_action(
     query: str
 ) -> str:
 
-    # =====================================
-    # 1. LLM ACTION
-    # =====================================
-
-    if action:
-
-        normalized = ACTION_MAPPINGS.get(
-            action.lower().strip()
-        )
-
-        if normalized:
-            return normalized
-
-
     q = query.lower()
 
     update_keywords = [
@@ -106,6 +92,19 @@ def normalize_action(
 
     if any(word in q for word in delete_keywords):
         return "delete"
+
+    # =====================================
+    # 2. LLM ACTION FALLBACK
+    # =====================================
+
+    if action:
+
+        normalized = ACTION_MAPPINGS.get(
+            action.lower().strip()
+        )
+
+        if normalized:
+            return normalized
 
     return "fetch"
 
@@ -283,9 +282,23 @@ def detect_source(
     ]):
         return "alert"
 
+    # Check if time_range is strictly for today only
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    is_today_only = False
+    if time_range:
+        if isinstance(time_range, (list, tuple)) and len(time_range) == 2:
+            start_date, end_date = time_range
+            if start_date == today and end_date == today:
+                is_today_only = True
+
     # SUMMARY
-    if aggregation or time_range or "summary" in q or "report" in q:
-        return "summary"
+    # If the range is strictly for today, only route to summary if explicitly requested via "summary" or "report"
+    if is_today_only:
+        if aggregation or "summary" in q or "report" in q:
+            return "summary"
+    else:
+        if aggregation or time_range or "summary" in q or "report" in q:
+            return "summary"
 
     # LATEST
     if any(word in q for word in [
@@ -482,6 +495,9 @@ def post_validate(
         )
 
         clean_data["source"] = source
+
+        if source == "latest":
+            clean_data["time_range"] = None
 
 
         if source == "alert":

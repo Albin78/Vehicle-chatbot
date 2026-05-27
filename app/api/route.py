@@ -1,3 +1,4 @@
+import re
 from fastapi import APIRouter
 
 from app.schemas.request_schema import QueryRequest
@@ -47,7 +48,39 @@ def query_system(data: QueryRequest):
     logger.info(f"Intent: {intent}")
     logger.info(f"Intent vehicle id: {intent.vehicle_id}")
 
+
+    
+    def is_general_query(q_str: str) -> bool:
+        q = q_str.lower().strip()
+        greetings = {"hi", "hello", "hey", "good morning", "good afternoon", "good evening", "howdy", "hola"}
+        if q in greetings or any(q.startswith(g + " ") for g in greetings):
+            return True
+        bot_info = {"who are you", "what is your name", "what can you do", "help", "how are you", "what is this"}
+        if any(info in q for info in bot_info):
+            return True
+        has_vehicle_pattern = bool(re.search(r"\d", q))
+        in_domain_keywords = [
+            "vehicle", "truck", "car", "bus", "tanker", "can", "fleet", 
+            "alert", "overspeed", "violation", "summary", "report", "status", 
+            "latest", "current", "today", "yesterday", "fuel", "speed", "mileage", 
+            "distance", "battery", "ignition", "engine", "location", "latitude", 
+            "longitude", "odometer", "weight", "gsm", "signal", "wasl", "seatbelt", 
+            "door", "camera", "immobiliz", "driver", "group", "network", "satellite", 
+            "model", "make", "manufacturer", "imei"
+        ]
+        has_in_domain_kw = any(kw in q for kw in in_domain_keywords)
+        if not has_vehicle_pattern and not has_in_domain_kw:
+            return True
+        general_question_starts = ["who is", "who was", "what is a", "what are", "tell me about", "how to build", "how do i"]
+        if any(q.startswith(start) for start in general_question_starts) and not has_in_domain_kw:
+            return True
+        return False
+
     if not intent.vehicle_id:
+        if is_general_query(data.query):
+            return {
+                "response": "I am a specialized fleet management assistant. I can help you check vehicle status, track telemetry metrics, summarize reports, or view alerts for your fleet. Please provide a vehicle ID (e.g., 1832RXB) to query vehicle information."
+            }
         return {"response": "Please provide a vehicle ID to proceed."}  
 
     intent_validation = validate_intent(intent)
