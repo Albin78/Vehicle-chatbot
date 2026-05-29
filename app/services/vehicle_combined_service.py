@@ -42,6 +42,83 @@ def handle_vehicle_service(
     logger.info(f"[SERVICE] Vehicle: {vehicle}")
 
     # --------------------------------------------------
+    # PRE-CHECK: ALERT ENABLEMENT CHECK FOR FOCUSED ALERTS
+    # --------------------------------------------------
+    if intent.source == "alert" and getattr(intent, "alert_focus", None):
+        alert_focus_raw = intent.alert_focus.lower().replace("_", "").replace("-", "")
+        
+        # Let's map alert_focus_raw to canonical key
+        MAPPING = {
+            "overspeed": "overSpeed",
+            "idling": "idling",
+            "overstay": "overStay",
+            "battery_disconnection": "batteryDisconnection",
+            "battery_disconnect": "batteryDisconnection",
+            "low_battery": "lowBattery",
+            "rash_driving": "rashDriving",
+            "harsh_driving": "rashDriving",
+            "continuous": "continuous",
+            "continuous_driving": "continuous",
+            "territory": "territory",
+            "geofence": "territory",
+            "refuel_drain": "refuelDrain",
+            "fuel_disconnection": "fuelDisconnection",
+            "parkfence": "parkfence",
+            "park_fence": "parkfence",
+            "overload": "overload",
+            "weight_tamper": "WeightTamper",
+            "accident": "Accident",
+            "seatbelt": "seatbelt",
+            "asset_movement": "assetmovement",
+            "assetmovement": "assetmovement",
+            "territory_overspeed": "territoryOverSpeed",
+            "territoryoverspeed": "territoryOverSpeed",
+            "safe_stop_fuel_drainer": "safeStopFuelDrainer",
+            "equipment_bypass": "equipmentByPass",
+            "afterhoursmovement": "afterhoursmovement",
+            "afterhours_movement": "afterhoursmovement",
+            "afterhours": "afterhoursmovement",
+            "after_hours": "afterhoursmovement",
+            "zone_based_speed_limit": "zoneBasedSpeedLimit",
+        }
+        
+        alert_flag_key = None
+        for k, v in MAPPING.items():
+            k_clean = k.lower().replace("_", "").replace("-", "")
+            if alert_focus_raw == k_clean or alert_focus_raw in k_clean:
+                alert_flag_key = v
+                break
+        
+        if alert_flag_key:
+            from app.tools.external_api_tool import get_alert_enable_status
+            from app.builders.alert_enable_builder import ALERT_DISPLAY_NAMES
+            
+            logger.info(f"[SERVICE] Checking enablement status for {alert_flag_key} on vehicle {intent.vehicle_id}")
+            api_result = get_alert_enable_status(company_id=company_id)
+            if isinstance(api_result, dict) and not api_result.get("response"):
+                data_list = api_result.get("data", [])
+                if isinstance(data_list, list):
+                    matched_record = None
+                    vehicle_numeric_id = vehicle.get("ID")
+                    for record in data_list:
+                        if isinstance(record, dict):
+                            record_id = record.get("ID")
+                            if record_id and str(record_id) == str(vehicle_numeric_id):
+                                matched_record = record
+                                break
+                    
+                    if matched_record:
+                        values = matched_record.get("values", {})
+                        if isinstance(values, dict):
+                            flag_value = values.get(alert_flag_key)
+                            logger.info(f"[SERVICE] Enablement status value for {alert_flag_key}: {flag_value}")
+                            if flag_value is False:
+                                display_name = ALERT_DISPLAY_NAMES.get(alert_flag_key, alert_flag_key)
+                                return {
+                                    "error": f"{display_name} alerts are currently disabled in the configuration for vehicle {intent.vehicle_id}. Please enable it in the policy settings to track this metric."
+                                }
+
+    # --------------------------------------------------
     # BUILD PAYLOAD WITH DYNAMIC DATE BACKOFF FOR ALERTS
     # --------------------------------------------------
 

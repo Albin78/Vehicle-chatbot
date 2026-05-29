@@ -65,8 +65,10 @@ if submit:
                 )
 
             if response.status_code != 200:
-                st.error(f"API Error: {response.status_code}")
-                st.text(response.text)
+                st.warning(
+                    "I apologize, but I am having trouble reaching the vehicle network right now. "
+                    "Please try your request again in a few moments."
+                )
 
             else:
                 data = response.json()
@@ -79,7 +81,10 @@ if submit:
                 })
 
         except Exception as e:
-            st.error(f"Error: {str(e)}")
+            st.warning(
+                "I apologize, but I am having trouble reaching the vehicle network right now. "
+                "Please try your request again in a few moments."
+            )
 
 # -------------------------
 # Display History

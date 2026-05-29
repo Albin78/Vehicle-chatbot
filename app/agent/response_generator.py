@@ -165,7 +165,7 @@ def generate_response(result, intent):
 
     response = llm.generate(prompt).strip()
 
-    if result.get("type") == "summary":
+    if result.get("type") in ["summary", "summary_metric"]:
         query_str = getattr(intent, "query", "") or ""
         query_lower = query_str.lower()
 

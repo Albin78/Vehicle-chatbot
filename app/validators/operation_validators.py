@@ -275,10 +275,12 @@ def detect_source(
         return "alert_enable"
 
     # ALERT
-    if any(word in q for word in [
+    if extract_alert_focus(q) is not None or any(word in q for word in [
         "alert",
+        "alerts",
         "overspeed",
-        "violation"
+        "violation",
+        "violations"
     ]):
         return "alert"
 
@@ -318,10 +320,10 @@ def extract_alert_focus(query: str):
 
     q = query.lower()
 
-    if "overspeed" in q:
+    if "overspeed" in q or "over speed" in q:
         return "overspeed"
 
-    if "idling" in q:
+    if "idling" in q or "idle" in q:
         return "idling"
 
     if (
@@ -330,6 +332,12 @@ def extract_alert_focus(query: str):
         or "after hours" in q
     ):
         return "afterhoursmovement"
+
+    # Match against other known synonyms, checking longer phrases first
+    sorted_synonyms = sorted(ALERT_TYPE_SYNONYMS.items(), key=lambda x: len(x[0]), reverse=True)
+    for phrase, canonical in sorted_synonyms:
+        if phrase in q:
+            return canonical
 
     return None
 
