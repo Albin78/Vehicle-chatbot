@@ -100,7 +100,7 @@ def combined_report(
             "User-Agent": "MyUserAgent"
         }
 
-        url = "https://api.girfalco.sa/v2/report/combinedVehicleReport"
+        url = settings.COMBINED_VEHICLE
 
         params = {
             "vid": vehicle_id,
@@ -110,7 +110,7 @@ def combined_report(
             "fullRows": "true"
         }
 
-        logger.info(f"Calling Combined Report API for vehicleID: {vehicle_id}")
+        logger.info(f"Calling Combined Report API: {url} for vehicleID: {vehicle_id}")
 
         response = requests.get(
             url,
@@ -167,7 +167,7 @@ def get_alert_enable_status(
             "User-Agent": "MyUserAgent"
         }
 
-        url = "https://api.girfalco.sa/v2/alertV2/enable"
+        url = settings.ALERT_ENABLE
 
         params = {
             "cid": company_id,
@@ -178,7 +178,7 @@ def get_alert_enable_status(
         }
 
         logger.info(
-            f"Calling Alert Enable Status API: cid={company_id}"
+            f"Calling Alert Enable Status API: {url} with cid={company_id}"
         )
 
         response = requests.get(

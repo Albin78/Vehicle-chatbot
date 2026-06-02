@@ -85,3 +85,5 @@ to_add.txt
 /ssl
 
 fields.json
+
+*.tar

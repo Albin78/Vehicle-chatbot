@@ -1,9 +1,12 @@
+import os
+import urllib3
 import streamlit as st
 import requests
 
-# API_URL = "http://backend:5007/query"
-API_URL = "http://localhost:8000/query"
+# Disable InsecureRequestWarning for internal SSL container communication
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+API_URL = os.getenv("API_URL", "http://localhost:8000/query")
 
 st.set_page_config(page_title="VMS Chatbot", layout="wide")
 
@@ -61,7 +64,8 @@ if submit:
                         "query": query
                     },
                     headers={"Content-Type": "application/json"},
-                    timeout=15
+                    timeout=30,
+                    verify=False
                 )
 
             if response.status_code != 200:

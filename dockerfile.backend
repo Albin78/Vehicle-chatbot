@@ -14,6 +14,5 @@ COPY main.py .
 # COPY ssl/fullchain.pem /app/fullchain.pem
 
 # COPY ssl/privkey.pem /app/privkey.pem
- 
 EXPOSE 5007
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5007", "--timeout-keep-alive", "3600"]
+CMD ["sh", "-c", "if [ -s /app/ssl/fullchain.pem ] && [ -s /app/ssl/privkey.pem ]; then uvicorn main:app --host 0.0.0.0 --port 5007 --ssl-keyfile=/app/ssl/privkey.pem --ssl-certfile=/app/ssl/fullchain.pem --timeout-keep-alive 3600; else uvicorn main:app --host 0.0.0.0 --port 5007 --timeout-keep-alive 3600; fi"]

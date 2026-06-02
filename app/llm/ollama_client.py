@@ -19,6 +19,6 @@ class OllamaClient:
         response.raise_for_status()
 
         data = response.json()
-        print(f"Ollama client data: {data}")
+        # print(f"Ollama client data: {data}")
 
         return data["response"]

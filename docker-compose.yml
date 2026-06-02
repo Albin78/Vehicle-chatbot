@@ -8,17 +8,25 @@ services:
     ports:
       - "5007:5007"
     env_file:
-      - .env.development
+      - .env.production
+    volumes:
+      - ./ssl:/app/ssl:ro
     restart: unless-stopped
 
   frontend:
     build:
       context: .
       dockerfile: dockerfile.frontend
-    image: vmsbotfrontend:latest
+    image: vsmbotfrontend:latest
     container_name: vmsbot-frontend
     ports:
       - "5008:5008"
+    env_file:
+      - .env.production
+    volumes:
+      - ./ssl:/app/ssl:ro
+    environment:
+      - API_URL=${API_URL:-http://backend:5007/query}
     depends_on:
       - backend
     restart: unless-stopped
