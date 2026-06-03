@@ -87,10 +87,12 @@ def normalize_action(
         "remove"
     ]
 
-    if any(word in q for word in update_keywords):
+    # Use word-level matching to avoid false positives like 'updated'
+    words = set(q.split())
+    if any(word in words for word in update_keywords):
         return "update"
 
-    if any(word in q for word in delete_keywords):
+    if any(word in words for word in delete_keywords):
         return "delete"
 
     # =====================================
@@ -158,8 +160,9 @@ ALERT_TYPE_SYNONYMS = {
     "overload": "overload",
     "weight tamper": "WeightTamper",
     "accident": "Accident",
-    "seatbelt": "seatbelt",
-    "seat belt": "seatbelt",
+    # seatbelt / seat belt are realtime metrics, NOT alert types.
+    # They must NOT appear here — remove them so extract_alert_focus()
+    # never matches a plain "seatbelt status" query.
     "asset movement": "assetmovement",
     "asset move": "assetmovement",
     "territory overspeed": "territoryOverSpeed",
@@ -176,16 +179,28 @@ ALERT_TYPE_SYNONYMS = {
 
 
 def detect_alert_enable_query(query: str) -> bool:
+    """
+    Return True ONLY when the user explicitly asks about enabling /
+    disabling an alert configuration.
 
+    Two conditions must BOTH be met:
+      1) An enable/disable cue is present  (e.g. enable, disable, turned on)
+      2) The word "alert" / "alerts" is present
+
+    We intentionally do NOT rely on ALERT_TYPE_SYNONYMS here because
+    some synonyms (e.g., former "seatbelt" entry) are realtime metrics
+    and must NOT trigger the alert-enable pipeline.
+    """
     q = query.lower()
 
+    # 1) Must contain an enable / disable keyword
     if not any(kw in q for kw in ALERT_ENABLE_KEYWORDS):
         return False
 
-    has_alert_word = "alert" in q or "alerts" in q
-    has_alert_synonym = any(syn in q for syn in ALERT_TYPE_SYNONYMS)
-
-    return has_alert_word or has_alert_synonym
+    # 2) Must explicitly mention "alert" — e.g. "seatbelt alert"
+    #    Queries like "seatbelt status" do NOT contain "alert"
+    #    and will correctly fall through to the realtime pipeline.
+    return "alert" in q or "alerts" in q
 
 
 def extract_alert_type_focus(query: str) -> str | None:
