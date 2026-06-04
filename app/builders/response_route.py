@@ -45,6 +45,11 @@ def build_response(intent, api_result):
             api_result
         )
 
+    if intent.source == "fleet_analytics":
+        # Fleet analytics results are already structured by fleet_service.
+        # Pass them directly — the response generator handles formatting.
+        return api_result
+
     return {
         "type": "error",
         "message": "Unsupported source"

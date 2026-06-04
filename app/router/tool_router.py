@@ -6,6 +6,10 @@ from app.services.alert_enable_service import (
     handle_alert_enable_service
 )
 
+from app.services.fleet_service import (
+    handle_fleet_service
+)
+
 from app.tools.db_tool import fetch_telemetry
 from app.tools.analytics_tool import run_analytics
 
@@ -48,6 +52,13 @@ def route_tool(intent, plan, company_id):
 
         if intent.source == "alert_enable":
             return handle_alert_enable_service(
+                intent=intent,
+                plan=plan,
+                company_id=company_id
+            )
+
+        if intent.source == "fleet_analytics":
+            return handle_fleet_service(
                 intent=intent,
                 plan=plan,
                 company_id=company_id

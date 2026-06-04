@@ -1,5 +1,6 @@
 import re
 from fastapi import APIRouter
+from time import time
 
 from app.schemas.request_schema import QueryRequest
 from app.agent.intent_extractor import extract_intent
@@ -15,6 +16,8 @@ router = APIRouter()
 
 @router.post("/query")
 def query_system(data: QueryRequest):
+
+    start_time = time()
 
     if not data.query:
         return {"response": "Please provide query."}
@@ -64,7 +67,7 @@ def query_system(data: QueryRequest):
                 return True
             return False
 
-        if not intent.vehicle_id:
+        if not intent.vehicle_id and intent.source != "fleet_analytics":
             if is_general_query(data.query):
                 return {
                     "response": "I am a specialized fleet management assistant. I can help you check vehicle status, track telemetry metrics, summarize reports, or view alerts for your fleet. Please provide a vehicle ID (e.g., 1832RXB) to query vehicle information."
@@ -83,7 +86,7 @@ def query_system(data: QueryRequest):
         # -----------------------------
         vehicle_context = None
 
-        if intent.vehicle_id:
+        if intent.vehicle_id and intent.source != "fleet_analytics":
             vehicle_context = resolve_vehicle(intent.vehicle_id, company_id)
 
             if not vehicle_context:
@@ -111,6 +114,9 @@ def query_system(data: QueryRequest):
         response = generate_response(validated_result, intent)
 
         logger.info(f"Response: {response}")
+
+        end_time = time()
+        logger.info(f"Total time taken: {end_time - start_time} seconds")
 
         return {"response": response}
 

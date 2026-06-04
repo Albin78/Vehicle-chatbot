@@ -11,6 +11,21 @@ def create_plan(
 ) -> ExecutionPlan:
 
 
+    # --------------------------------------------------
+    # FLEET ANALYTICS — no specific vehicle, fleet-wide
+    # --------------------------------------------------
+    if intent.source == "fleet_analytics":
+
+        return ExecutionPlan(
+            tool="external_api",
+            operation="fleet_analytics",
+            metrics=intent.metrics,
+            aggregation=intent.fleet_aggregation,
+            time_range=intent.time_range,
+            fleet_scope=True
+            # imei / vehicle_id intentionally omitted
+        )
+
     if intent.source in {
         "latest",
         "summary",

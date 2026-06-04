@@ -107,7 +107,8 @@ def validate_intent(intent):
         "latest",
         "summary",
         "alert",
-        "alert_enable"
+        "alert_enable",
+        "fleet_analytics"
     }
 
     if intent.source not in valid_sources:
@@ -117,7 +118,7 @@ def validate_intent(intent):
             "message": "Invalid source detected"
         }
 
-    if not intent.vehicle_id:
+    if not intent.vehicle_id and intent.source != "fleet_analytics":
 
         return {
             "type": "error",

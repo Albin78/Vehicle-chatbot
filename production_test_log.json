@@ -1,0 +1,90 @@
+[
+    {
+        "query": "what is the current status of vehicle 1832RXB?",
+        "response": "Vehicle 1832 RXB (Pick Up, Isuzu DOUBLE CABIN 2022) is currently stopped with the engine off and belongs to Flames Hydraulic Co, Info, Others, Test Group.\n\n* **Specifications**: Manufactured by Isuzu, DOUBLE CABIN 2022 model, classified as can, with odometer reading of 158701.5 km, IMEI 868963040937609, and Camera IMEI 940076337414\n* **Connectivity & Power**: GSM signal is good with value of 5, and battery voltage is 13.0 V\n* **Fuel & Tanks**: Fuel level is 0.0% of 400 L capacity, and tanker fuel level is 0.0% of 8000 L capacity\n* **Safety & Security**: Ignition is off, seatbelt is equipped but not fastened, remote immobilization is supported (not currently immobilized), and camera is equipped with 1 camera channel\n\nDriver assigned is Vipin. Last updated: Jun 04, 2026 01:16 PM UTC. Location map: https://www.google.com/maps?q=26.4325016,50.1023799"
+    },
+    {
+        "query": "what is the maximum speed of vehicle 1832RXB over the last week?",
+        "response": "Vehicle 1832RXB had a maximum speed of 114 km/h during the period from May 25 to May 31."
+    },
+    {
+        "query": "give me the alert history for 1832RXB yesterday",
+        "response": "Vehicle 1832RXB has recorded 26 alerts, with the most frequent alert type being overspeed. The daily alert trend shows a total of 26 overspeed alerts on June 2. The latest recorded alert was an overspeed event, occurring at 105 km/hr against a limit of 100 km/hr, lasting 59 seconds and located at https://maps.google.com/?q=26.3442766,50.0326716.\n\n*Note: No alerts were found on Jun 03, 2026. To provide useful context, the system has dynamically backed off to show alerts found in the past period from May 27, 2026 to Jun 03, 2026.*"
+    },
+    {
+        "query": "hey, can you check on the current status for 1832RXB right now?",
+        "response": "Vehicle 1832 RXB (Pick Up, Isuzu DOUBLE CABIN 2022) is currently stopped with the engine off and belongs to Flames Hydraulic Co, Info, Others, Test Group.\n\n* **Specifications**: Manufactured by Isuzu, DOUBLE CABIN 2022 model, classified as can, with odometer reading of 158701.5 km, IMEI 868963040937609, and Camera IMEI 940076337414\n* **Connectivity & Power**: GSM signal is good with value of 5, and battery voltage is 13.0 V\n* **Fuel & Tanks**: Fuel level is 0.0% of 400 L capacity, and tanker fuel level is 0.0% of 8000 L capacity\n* **Safety & Security**: Ignition is off, seatbelt is equipped but not fastened, remote immobilization is supported (not currently immobilized), and camera is equipped with 1 camera channel\n\nDriver assigned is Vipin. Last updated: Jun 04, 2026 01:16 PM UTC. Location map: https://www.google.com/maps?q=26.4325016,50.1023799"
+    },
+    {
+        "query": "i need to know the max speed that 1832RXB hit over the last week.",
+        "response": "Vehicle 1832RXB had a maximum speed of 114 km/h from May 25 to May 31."
+    },
+    {
+        "query": "is 1832RXB moving or stopped?",
+        "response": "Vehicle 1832 RXB is currently stationary at 0 km/h. Last updated on June 4, 2026, at 01:16 PM UTC."
+    },
+    {
+        "query": "what's going on with 1832RXB today?",
+        "response": "Vehicle 1832 RXB (Pick Up, Isuzu DOUBLE CABIN 2022) is currently stopped with the engine off and belongs to Flames Hydraulic Co, Info, Others, Test Group.\n\n* **Specifications**: Manufactured by Isuzu, DOUBLE CABIN 2022 model, classified as can, with odometer reading of 158701.5 km, IMEI 868963040937609, and Camera IMEI 940076337414\n* **Connectivity & Power**: GSM signal is good with value of 5, and battery voltage is 13.0 V\n* **Fuel & Tanks**: Fuel level is 0.0% of 400 L capacity, and tanker fuel level is 0.0% of 8000 L capacity\n* **Safety & Security**: Ignition is off, seatbelt is equipped but not fastened, remote immobilization is supported (not currently immobilized), and camera is equipped with 1 camera channel\n\nDriver assigned is Vipin. Last updated: Jun 04, 2026 01:16 PM UTC. Location map: https://www.google.com/maps?q=26.4325016,50.1023799"
+    },
+    {
+        "query": "what is the status of the entire fleet?",
+        "response": "Fleet Overview for the Period of May 28, 2026, to June 4, 2026:\n\n\u2022 Total Vehicles: 23\n\u2022 Vehicle Movement Status:\n  \u2022 Moving: 1 vehicle\n  \u2022 Idle: 1 vehicle\n  \u2022 Stopped: 17 vehicles\n\u2022 Network Connectivity Status:\n  \u2022 Out of network: 2 vehicles\n  \u2022 Disconnected: 2 vehicles\n\u2022 Fleet Performance Metrics:\n  \u2022 Total Distance Traveled: 0 km\n  \u2022 Total Idle Time: 0 minutes\n  \u2022 Total Stop Time: 0 minutes\n  \u2022 Total Moving Time: 0 minutes"
+    },
+    {
+        "query": "which driver had the highest speed last week?",
+        "response": "Here are the key fleet analytics facts:\n\n\u2022 Driver 'Rubel Miah Fajul (43535)' operating vehicle 6667 DKB recorded the highest maximum speed of 134.0 km/h from May 25, 2026 to May 31, 2026."
+    },
+    {
+        "query": "how many overspeed alerts were there across the fleet?",
+        "response": "There were 412 fleet alerts recorded between May 28th and June 4th, 2026. The breakdown by alert type is as follows:\n\n\u2022 Overspeed incidents: 412\n\u2022 Seatbelt-related incidents: 95\n\u2022 Idling events: 19\n\u2022 After-hours movement incidents: 9"
+    },
+    {
+        "query": "which vehicle travelled the most distance?",
+        "response": "Vehicle 0017 BRD, driven by Muhammed NIAS, achieved the highest total distance of 1,680.6 kilometers from May 28, 2026, to June 4, 2026."
+    },
+    {
+        "query": "give me a quick overview of how the entire fleet is doing right now",
+        "response": "Fleet Overview for May 28, 2026 - June 4, 2026:\n\n* Vehicle Count: 23\n* Vehicle Status:\n  \u2022 Moving: 1 vehicle\n  \u2022 Idle: 1 vehicle\n  \u2022 Stopped: 17 vehicles\n* Out-of-Network Vehicles: 2\n* Disconnected Vehicles: 2\n* Fleet Activity:\n  \u2022 Total Distance Traveled: 0 km\n  \u2022 Idle Time: 0 minutes\n  \u2022 Stop Time: 0 minutes\n  \u2022 Moving Time: 0 minutes"
+    },
+    {
+        "query": "how many vehicles are currently moving vs idling?",
+        "response": "Here is the rewritten response:\n\nFleet overview from May 28, 2026, to June 4, 2026:\n\u2022 Total vehicles: 23\n\u2022 Vehicle status breakdown:\n    \u2022 Moving: 1 vehicle\n    \u2022 Idle: 1 vehicle\n    \u2022 Stopped: 17 vehicles\n\u2022 Network coverage:\n    \u2022 Out of network: 2 vehicles\n    \u2022 Disconnected: 2 vehicles\n\u2022 Fleet activity metrics:\n    \u2022 Total distance traveled: 0 km\n    \u2022 Total idle time: 0 minutes\n    \u2022 Total stop time: 0 minutes\n    \u2022 Total moving time: 0 minutes"
+    },
+    {
+        "query": "i want to know who drove the fastest out of all the drivers last week",
+        "response": "Driver Rubel Miah Fajul (43535) in vehicle 6667 DKB recorded the highest maximum speed of 134.0 km/h on May 25th to May 31st, 2026."
+    },
+    {
+        "query": "which truck has covered the maximum mileage across the company?",
+        "response": "Please provide a vehicle ID to proceed."
+    },
+    {
+        "query": "can you tell me which vehicle was idling the most recently?",
+        "response": "Vehicle 6667 DKB, driven by Rubel Miah Fajul, recorded the highest idle time with 16 hours and 25 minutes, spanning from May 28, 2026, to June 4, 2026."
+    },
+    {
+        "query": "are there a lot of overspeed alerts? tell me how many we had across the whole fleet.",
+        "response": "There were 412 alerts recorded between May 28th, 2026, and June 4th, 2026. The alert distribution is as follows:\n\n\u2022 Overspeed: 412\n\u2022 SeatBelt: 95\n\u2022 Idling: 19\n\u2022 Afterhours movement: 9"
+    },
+    {
+        "query": "which driver has the worst record for overspeeding?",
+        "response": "Driver Rubel Miah Fajul (43535), operating vehicle 6667 DKB, achieved the highest maximum speed of 133.0 km/h during the period May 28, 2026 to June 4, 2026."
+    },
+    {
+        "query": "show me the distribution of different types of violations in the fleet.",
+        "response": "Here is the rewritten fleet analytics data:\n\nFleet Performance Summary for Time Range May 28, 2026 - June 4, 2026:\n\n\u2022 Overspeed incidents: 412\n\u2022 Seatbelt infractions: 95\n\u2022 Idle time: 19 hours\n\u2022 After-hours movement: 9 occurrences"
+    },
+    {
+        "query": "is anyone speeding right now?",
+        "response": "Please provide a vehicle ID to proceed."
+    },
+    {
+        "query": "what's the total distance we drove as a company in the last 7 days?",
+        "response": "Please provide a vehicle ID to proceed."
+    },
+    {
+        "query": "who is slacking off and idling the most?",
+        "response": "I am a specialized fleet management assistant. I can help you check vehicle status, track telemetry metrics, summarize reports, or view alerts for your fleet. Please provide a vehicle ID (e.g., 1832RXB) to query vehicle information."
+    }
+]

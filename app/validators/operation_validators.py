@@ -280,7 +280,8 @@ def apply_default_summary_time_range(query: str, clean_data: dict) -> bool:
 def detect_source(
     query: str,
     aggregation,
-    time_range
+    time_range,
+    vehicle_id = None
 ):
 
     q = query.lower()
@@ -288,6 +289,31 @@ def detect_source(
     # ALERT ENABLE / DISABLE CHECK
     if detect_alert_enable_query(q):
         return "alert_enable"
+
+    # --------------------------------------------------
+    # FLEET ANALYTICS
+    # Triggered when NO vehicle_id is present AND the
+    # query contains comparative / fleet-wide keywords.
+    # Must be checked BEFORE alert / summary detection
+    # so that "which driver had most overspeed alerts"
+    # is routed to fleet_analytics, not plain "alert".
+    # --------------------------------------------------
+    if not vehicle_id:
+        fleet_keywords = [
+            "which driver", "which vehicle", "who drove",
+            "all vehicles", "entire fleet", "fleet",
+            "most distance", "most idle", "least idle",
+            "most moving", "highest speed", "lowest speed",
+            "maximum speed", "minimum speed",
+            "most overspeed", "most alerts", "most violations",
+            "rank", "top vehicle", "top driver",
+            "fleet status", "fleet overview",
+            "how many vehicles", "list all vehicles",
+            "vehicles moving", "vehicles stopped", "vehicles idle",
+            "vehicles are moving", "vehicles are stopped", "vehicles are idle",
+        ]
+        if any(kw in q for kw in fleet_keywords):
+            return "fleet_analytics"
 
     # ALERT
     if extract_alert_focus(q) is not None or any(word in q for word in [
@@ -430,6 +456,107 @@ def extract_alert_response_type(query: str):
 
 
 
+# =========================================================
+# FLEET FIELD EXTRACTION
+# =========================================================
+
+def _extract_fleet_fields(query: str) -> dict:
+    """
+    Parses fleet-specific intent fields from the query text.
+    Called only when source == "fleet_analytics".
+
+    Returns a dict with keys:
+        fleet_scope, fleet_metric, fleet_aggregation,
+        fleet_subject, fleet_filter, fleet_query_type
+    """
+    q = query.lower()
+
+    # ---- SUBJECT: driver vs vehicle ---------------------------------
+    if any(w in q for w in ["driver", "who drove", "which driver"]):
+        subject = "driver"
+    else:
+        subject = "vehicle"
+
+    # ---- AGGREGATION ------------------------------------------------
+    if any(w in q for w in ["highest", "maximum", "max", "most", "peak", "worst"]):
+        aggregation = "maximum"
+    elif any(w in q for w in ["lowest", "minimum", "min", "least", "best"]):
+        aggregation = "minimum"
+    elif any(w in q for w in ["rank", "list all", "all vehicles", "ranking"]):
+        aggregation = "list"
+    elif any(w in q for w in ["how many", "count", "total alerts", "number of"]):
+        aggregation = "count"
+    else:
+        aggregation = "maximum"
+
+    # ---- METRIC -----------------------------------------------------
+    metric = None
+
+    if any(w in q for w in ["alert", "alerts", "violation", "violations"]):
+        metric = "alerts"
+    elif any(w in q for w in ["speed", "fast", "overspeed"]):
+        metric = "speed"
+    elif any(w in q for w in ["distance", "km", "kilometres", "mileage"]):
+        metric = "distance"
+    elif any(w in q for w in ["idle", "idling"]):
+        metric = "idle_time"
+    elif any(w in q for w in ["moving time", "drive time", "driving time"]):
+        metric = "moving_time"
+    elif any(w in q for w in ["engine hour", "engine hours"]):
+        metric = "engine_hours"
+    elif any(w in q for w in [
+        "status", "overview", "summary", "how many vehicles",
+        "fleet status", "fleet overview"
+    ]):
+        metric = "status"
+
+    # ---- FILTER (live status or alert type) -------------------------
+    filt = None
+
+    if "moving" in q or "vehicles are moving" in q:
+        filt = "moving"
+    elif "idle" in q and metric != "idle_time":
+        filt = "idle"
+    elif "stopped" in q:
+        filt = "stopped"
+    elif "out of network" in q or "out network" in q:
+        filt = "out_network"
+    elif "disconnected" in q:
+        filt = "disconnected"
+    elif "overspeed" in q or "over speed" in q:
+        filt = "overspeed"
+    elif "seatbelt" in q or "seat belt" in q:
+        filt = "seatbelt"
+    elif "afterhours" in q or "after hours" in q or "after-hours" in q:
+        filt = "afterhoursmovement"
+    elif "idling" in q and metric == "alerts":
+        filt = "idling"
+
+    # ---- QUERY TYPE (fine-grained routing hint) ---------------------
+    qtype = None
+
+    if any(w in q for w in ["fleet status", "fleet overview", "how many vehicles"]):
+        qtype = "fleet_overview"
+    elif (metric == "alerts" and aggregation == "count") or "how many" in q and ("alert" in q or "violation" in q):
+        qtype = "alert_count"
+        metric = "alerts"
+        aggregation = "count"
+    elif any(w in q for w in ["distribution", "breakdown", "types of alert"]):
+        qtype = "alert_distribution"
+    elif metric == "alerts" and aggregation == "list":
+        qtype = "alert_list"
+
+    return {
+        "fleet_scope":       True,
+        "fleet_metric":      metric,
+        "fleet_aggregation": aggregation,
+        "fleet_subject":     subject,
+        "fleet_filter":      filt,
+        "fleet_query_type":  qtype,
+    }
+
+
+
 def detect_summary_requested(query: str):
 
     q = query.lower()
@@ -487,8 +614,8 @@ def post_validate(
         vehicle_id = resolve_vehicle(query, vehicle_cache)
         logger.info(f"Vehicle extracted from extraction function: {vehicle_id}")
         
-        if vehicle_id:
-            clean_data["vehicle_id"] = vehicle_id
+        # Explicitly overwrite to prevent LLM hallucinations from slipping through
+        clean_data["vehicle_id"] = vehicle_id
          
         extracted_metrics = extract_metrics(query)
 
@@ -514,13 +641,30 @@ def post_validate(
         source = detect_source(
             query=query,
             aggregation=clean_data.get("aggregation"),
-            time_range=clean_data.get("time_range")
+            time_range=clean_data.get("time_range"),
+            vehicle_id=vehicle_id
         )
 
         clean_data["source"] = source
 
         if source == "latest":
             clean_data["time_range"] = None
+
+        # =========================================
+        # FLEET ANALYTICS FIELD EXTRACTION
+        # =========================================
+        if source == "fleet_analytics":
+            fleet_info = _extract_fleet_fields(query)
+            clean_data.update(fleet_info)
+            # Ensure no vehicle_id slips through to block fleet queries
+            clean_data["vehicle_id"] = None
+            
+            # Apply default time range for fleet queries
+            if not clean_data.get("time_range"):
+                from datetime import timedelta
+                today     = get_today_str()
+                week_ago  = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+                clean_data["time_range"] = (week_ago, today)
 
 
         if source == "alert":

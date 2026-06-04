@@ -19,3 +19,5 @@ class ExecutionPlan(BaseModel):
     vehicle_id: Optional[str] = None
 
     time_range: Optional[tuple[str, str]] = None
+
+    fleet_scope: bool = False   # True = fleet-wide, no vid required

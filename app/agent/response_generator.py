@@ -87,6 +87,20 @@ def generate_response(result, intent):
             f"INPUT: {base_message}\n"
             "OUTPUT:"
         )
+    elif result.get("type") == "fleet_analytics":
+        prompt = (
+            "You are a professional fleet management chatbot. Your task: rewrite the fleet analytics INPUT below into a natural, friendly, and highly professional OUTPUT response.\n"
+            "\n"
+            "CONTRACT:\n"
+            "- OUTPUT contains ONLY facts present in INPUT — nothing added, nothing omitted.\n"
+            "- Do not add any introductory header, extra commentary, notes, or conversational filler under any circumstances.\n"
+            "- Strictly output ONLY the rewritten response and absolutely nothing else.\n"
+            "- The INPUT is pre-formatted as English sentences. Simply polish it for readability.\n"
+            "- You may use clean bullet points if the INPUT contains a list of counts (e.g. moving, idle, stopped).\n"
+            "\n"
+            f"INPUT: {base_message}\n"
+            "OUTPUT:"
+        )
     else:
         prompt = (
             "You are a professional fleet management chatbot. Your task: rewrite the telemetry INPUT below into a natural, friendly, and highly professional OUTPUT sentence.\n"

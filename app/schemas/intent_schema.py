@@ -23,7 +23,8 @@ class QueryIntent(BaseModel):
             "latest",
             "summary",
             "alert",
-            "alert_enable"
+            "alert_enable",
+            "fleet_analytics"   # fleet-wide queries (no specific vehicle)
         ]
     ] = None
 
@@ -68,6 +69,28 @@ class QueryIntent(BaseModel):
     summary_time_range_default: bool = False
 
     query: Optional[str] = None
+
+    # ---------------------------------
+    # FLEET ANALYTICS FIELDS
+    # Set when source == "fleet_analytics"
+    # ---------------------------------
+    fleet_scope: bool = False
+
+    fleet_metric: Optional[str] = None
+    # e.g. "speed", "distance", "idle_time", "moving_time",
+    #      "engine_hours", "alerts", "status"
+
+    fleet_aggregation: Optional[str] = None
+    # "maximum" | "minimum" | "list" | "count"
+
+    fleet_subject: Optional[str] = None
+    # "driver" | "vehicle"
+
+    fleet_filter: Optional[str] = None
+    # e.g. "moving", "idle", "overspeed", "seatbelt"
+
+    fleet_query_type: Optional[str] = None
+    # fine-grained routing hint set by post_validate
 
 
 
@@ -161,5 +184,14 @@ class QueryIntent(BaseModel):
         if self.source != "alert_enable":
             self.alert_enable_check = False
             self.alert_type_focus = None
+
+        # fleet fields are only meaningful for fleet_analytics
+        if self.source != "fleet_analytics":
+            self.fleet_scope       = False
+            self.fleet_metric      = None
+            self.fleet_aggregation = None
+            self.fleet_subject     = None
+            self.fleet_filter      = None
+            self.fleet_query_type  = None
 
         return self

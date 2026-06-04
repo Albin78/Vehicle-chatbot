@@ -4,6 +4,7 @@ from app.response_generator.realtime_formatter import format_realtime
 from app.response_generator.alert_formatter import format_alert
 from app.response_generator.summary_formatter import format_summary
 from app.response_generator.alert_enable_formatter import format_alert_enable
+from app.response_generator.fleet_analytics_formatter import format_fleet_analytics
 from app.utils.logger import logger
 
 
@@ -20,7 +21,8 @@ def build_user_message(result, intent):
         return format_realtime(result, intent)
 
     if (
-        "alert" in result_type
+        "alert" in (result_type or "")
+        and result_type not in ["fleet_analytics"]
         or result_type in [
             "overspeed_summary",
             "idling_summary",
@@ -41,8 +43,8 @@ def build_user_message(result, intent):
     ]:
         return format_summary(result, intent)
 
-    # if result_type == "metric":
-    #     return format_metric(result, intent)
+    if result_type == "fleet_analytics":
+        return format_fleet_analytics(result)
 
     return result.get(
         "message",
