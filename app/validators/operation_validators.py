@@ -301,13 +301,14 @@ def detect_source(
     if not vehicle_id:
         fleet_keywords = [
             "which driver", "which vehicle", "who drove",
-            "all vehicles", "entire fleet", "fleet",
+            "all vehicles", "entire fleet", "fleet", "company",
             "most distance", "most idle", "least idle",
             "most moving", "highest speed", "lowest speed",
             "maximum speed", "minimum speed",
             "most overspeed", "most alerts", "most violations",
             "rank", "top vehicle", "top driver",
-            "fleet status", "fleet overview",
+            "fleet status", "fleet overview", "overview", "overall status",
+            "status of vehicle", "status of all vehicles",
             "how many vehicles", "list all vehicles",
             "vehicles moving", "vehicles stopped", "vehicles idle",
             "vehicles are moving", "vehicles are stopped", "vehicles are idle",

@@ -96,6 +96,8 @@ def generate_response(result, intent):
             "- Do not add any introductory header, extra commentary, notes, or conversational filler under any circumstances.\n"
             "- Strictly output ONLY the rewritten response and absolutely nothing else.\n"
             "- The INPUT is pre-formatted as English sentences. Simply polish it for readability.\n"
+            "- Treat driver names as single immutable entities. Even if a driver name contains 'and' or multiple words, do not split it, rephrase it, or treat it as multiple people.\n"
+            "- Do not add quotes around vehicle names or driver names in the final response.\n"
             "- You may use clean bullet points if the INPUT contains a list of counts (e.g. moving, idle, stopped).\n"
             "\n"
             f"INPUT: {base_message}\n"

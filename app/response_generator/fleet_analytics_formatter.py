@@ -33,18 +33,23 @@ def format_fleet_analytics(result: dict) -> str:
     if q_type == "fleet_overview":
         overview = result.get("overview", {})
         totals = result.get("totals", {})
+        alerts_total = result.get("alerts_total", 0)
+        dist = result.get("alerts_distribution", {})
+        
+        dist_str = ", ".join(f"{k}: {v}" for k, v in dist.items()) if dist else "None"
+        
         return (
-            f"Fleet overview {tr_str}: "
-            f"Total vehicles: {overview.get('total', 0)}. "
-            f"Moving: {overview.get('moving', 0)}. "
-            f"Idle: {overview.get('idle', 0)}. "
-            f"Stopped: {overview.get('stopped', 0)}. "
-            f"Out of network: {overview.get('out_network', 0)}. "
-            f"Disconnected: {overview.get('disconnected', 0)}. "
-            f"Total distance: {totals.get('distance', 0)} km. "
-            f"Total idle time: {_format_value('idleTime', totals.get('idleTime', 0))}. "
-            f"Total stop time: {_format_value('stopTime', totals.get('stopTime', 0))}. "
-            f"Total moving time: {_format_value('movingTime', totals.get('movingTime', 0))}."
+            f"Fleet overview {tr_str}:\n"
+            f"- Current Status: Total {overview.get('total', 0)} vehicles "
+            f"(Moving: {overview.get('moving', 0)}, Idle: {overview.get('idle', 0)}, "
+            f"Stopped: {overview.get('stopped', 0)}, Out of network: {overview.get('out_network', 0)}, "
+            f"Disconnected: {overview.get('disconnected', 0)}).\n"
+            f"- Operations: Total distance {totals.get('totalDistance', 0)} km. "
+            f"Idle time: {totals.get('totalIdleTime', '0s')}. "
+            f"Stop time: {totals.get('totalStopTime', '0s')}. "
+            f"Moving time: {totals.get('totalMovingTime', '0s')}. "
+            f"Engine hours: {totals.get('totalEngineHours', '0s')}.\n"
+            f"- Alerts: {alerts_total} total alerts ({dist_str})."
         )
 
     if q_type == "fleet_alert_count":
@@ -60,22 +65,58 @@ def format_fleet_analytics(result: dict) -> str:
         subject = result.get("subject", "vehicle")
         plate = result.get("numberPlate", "Unknown")
         driver = result.get("driverName")
-        val = _format_value('value', result.get('value', 0), result.get('metric'))
-        metric = result.get("metric", "").replace("_", " ")
+        
+        if q_type in ("top_alert_vehicle", "top_alert_driver"):
+            val = result.get('alertCount', 0)
+            alert_type = result.get('alertType', 'all')
+            metric = "alerts" if alert_type == "all" else f"{alert_type} alerts"
+        else:
+            val = _format_value('value', result.get('value', 0), result.get('metric'))
+            raw_metric = result.get("metric", "")
+            metric_map = {
+                "idleTime": "idle time",
+                "movingTime": "moving time",
+                "stopTime": "stop time",
+                "engineHours": "engine hours",
+                "maxSpeed": "maximum speed",
+                "distance": "distance traveled"
+            }
+            metric = metric_map.get(raw_metric, raw_metric.replace("_", " "))
+            
         qualifier = "the highest" if q_type.startswith("top_") else "the lowest"
         
-        if subject == "driver":
-            driver_display = driver if driver else "Unknown Driver"
-            return (
-                f"Driver '{driver_display}' (in vehicle {plate}) had {qualifier} {metric} "
-                f"with a value of {val} {tr_str}."
-            )
+        if q_type in ("top_alert_vehicle", "top_alert_driver"):
+            if q_type == "top_alert_driver":
+                driver_display = driver if driver else "Unknown Driver"
+                if plate and plate != "Unknown" and plate != "Unknown Vehicle":
+                    return (
+                        f"Driver {driver_display} (in vehicle {plate}) had {qualifier} number of {metric} "
+                        f"with a total of {val} {tr_str}."
+                    )
+                else:
+                    return (
+                        f"Driver {driver_display} had {qualifier} number of {metric} "
+                        f"with a total of {val} {tr_str}."
+                    )
+            else:
+                driver_str = f" (Driver: {driver})" if driver else " (Driver: Unknown)"
+                return (
+                    f"Vehicle {plate}{driver_str} had {qualifier} number of {metric} "
+                    f"with a total of {val} {tr_str}."
+                )
         else:
-            driver_str = f" driven by {driver}" if driver else " (Driver: Unknown)"
-            return (
-                f"Vehicle {plate}{driver_str} had {qualifier} {metric} "
-                f"with a value of {val} {tr_str}."
-            )
+            if subject == "driver":
+                driver_display = driver if driver else "Unknown Driver"
+                return (
+                    f"Driver {driver_display} (in vehicle {plate}) had {qualifier} {metric} "
+                    f"with a value of {val} {tr_str}."
+                )
+            else:
+                driver_str = f" driven by {driver}" if driver else " (Driver: Unknown)"
+                return (
+                    f"Vehicle {plate}{driver_str} had {qualifier} {metric} "
+                    f"with a value of {val} {tr_str}."
+                )
 
     # Fallback to key-value string but cleaned up
     parts = []

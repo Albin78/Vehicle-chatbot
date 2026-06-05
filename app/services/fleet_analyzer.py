@@ -299,14 +299,28 @@ class FleetAnalyzer:
     ) -> dict:
         """Which driver triggered the most alerts (of a given type)?"""
         filtered = self.filter_alerts_by_type(alert_type)
-        counts = Counter(
-            a.get("DriverName") for a in filtered if a.get("DriverName")
-        )
+        
+        counts = defaultdict(int)
+        vehicles = {}
+        
+        for a in filtered:
+            driver = a.get("DriverName")
+            if not driver:
+                continue
+                
+            counts[driver] += 1
+            vn = a.get("VehicleName")
+            np = a.get("NumberPlate") or self.vn_to_np.get(vn, vn)
+            if np:
+                vehicles[driver] = np
+                
         if not counts:
             return {}
-        driver, count = counts.most_common(1)[0]
+            
+        driver, count = max(counts.items(), key=lambda x: x[1])
         return {
             "driverName":  driver,
+            "numberPlate": vehicles.get(driver, "Unknown Vehicle"),
             "alertCount":  count,
             "alertType":   alert_type or "all",
         }
@@ -317,19 +331,27 @@ class FleetAnalyzer:
         """Which vehicle had the most alerts (of a given type)?"""
         filtered = self.filter_alerts_by_type(alert_type)
         
-        # Group by numberPlate to be safe
-        def get_np(a):
+        counts = defaultdict(int)
+        drivers = {}
+        
+        for a in filtered:
             vn = a.get("VehicleName")
-            return a.get("NumberPlate") or self.vn_to_np.get(vn, vn)
-            
-        counts = Counter(
-            get_np(a) for a in filtered if a.get("VehicleName") or a.get("NumberPlate")
-        )
+            np = a.get("NumberPlate") or self.vn_to_np.get(vn, vn)
+            if not np:
+                continue
+                
+            counts[np] += 1
+            # Keep the latest or any driver name found for this vehicle in alerts
+            if a.get("DriverName"):
+                drivers[np] = a.get("DriverName")
+                
         if not counts:
             return {}
-        vehicle_np, count = counts.most_common(1)[0]
+            
+        vehicle_np, count = max(counts.items(), key=lambda x: x[1])
         return {
             "numberPlate": vehicle_np,
+            "driverName":  drivers.get(vehicle_np),
             "alertCount":  count,
             "alertType":   alert_type or "all",
         }

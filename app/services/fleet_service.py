@@ -132,6 +132,8 @@ def _dispatch(intent, analyzer: FleetAnalyzer) -> dict:
             "query_type": "fleet_overview",
             "overview":   analyzer.fleet_overview(),
             "totals":     analyzer.fleet_operation_totals(),
+            "alerts_total": analyzer.alerts_total,
+            "alerts_distribution": analyzer.alert_count_by_type(),
         }
 
     # --------------------------------------------------
@@ -247,4 +249,6 @@ def _dispatch(intent, analyzer: FleetAnalyzer) -> dict:
         "query_type": "fleet_overview",
         "overview":   analyzer.fleet_overview(),
         "totals":     analyzer.fleet_operation_totals(),
+        "alerts_total": analyzer.alerts_total,
+        "alerts_distribution": analyzer.alert_count_by_type(),
     }
