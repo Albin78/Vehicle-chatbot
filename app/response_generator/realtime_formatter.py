@@ -83,8 +83,8 @@ FIELD_FORMATTERS = {
 
     "driver_name":
         lambda v:
-            f"Driver assigned is "
-            f"{clean_driver_name(v)}",
+            "driver details not currently available" if not v or str(v).lower() in ("null", "na", "unknown", "none", "unassigned", "undefined")
+            else f"Driver assigned is {clean_driver_name(v)}",
 
     "group_name":
         lambda v:

@@ -91,3 +91,10 @@ fields.json
 /tests/*
 
 production_test_log.json
+
+scratch.py
+scratch2.py
+scratch_llm.py
+
+test_queries.py
+test.py

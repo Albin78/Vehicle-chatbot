@@ -300,13 +300,15 @@ def detect_source(
     # --------------------------------------------------
     if not vehicle_id:
         fleet_keywords = [
-            "which driver", "which vehicle", "who drove",
+            "which driver", "which vehicle", "who drove", "which truck", "which car", "which bus",
             "all vehicles", "entire fleet", "fleet", "company",
             "most distance", "most idle", "least idle",
             "most moving", "highest speed", "lowest speed",
-            "maximum speed", "minimum speed",
+            "maximum speed", "minimum speed", "who was speeding", "who is speeding",
+            "fastest driver", "fastest drivers", "fastest vehicle", "fastest vehicles",
             "most overspeed", "most alerts", "most violations",
-            "rank", "top vehicle", "top driver",
+            "most alert", "most violation", "frequent alert", "most overstay",
+            "rank", "top vehicle", "top driver", "top drivers",
             "fleet status", "fleet overview", "overview", "overall status",
             "status of vehicle", "status of all vehicles",
             "how many vehicles", "list all vehicles",
@@ -314,6 +316,9 @@ def detect_source(
             "vehicles are moving", "vehicles are stopped", "vehicles are idle",
         ]
         if any(kw in q for kw in fleet_keywords):
+            return "fleet_analytics"
+            
+        if "vehicles" in q and any(s in q for s in ["stopped", "moving", "idle", "disconnected", "out of network", "out network"]):
             return "fleet_analytics"
 
     # ALERT
@@ -473,13 +478,13 @@ def _extract_fleet_fields(query: str) -> dict:
     q = query.lower()
 
     # ---- SUBJECT: driver vs vehicle ---------------------------------
-    if any(w in q for w in ["driver", "who drove", "which driver"]):
+    if any(w in q for w in ["driver", "who drove", "which driver", "who was speeding", "who is speeding"]):
         subject = "driver"
     else:
         subject = "vehicle"
 
     # ---- AGGREGATION ------------------------------------------------
-    if any(w in q for w in ["highest", "maximum", "max", "most", "peak", "worst"]):
+    if any(w in q for w in ["highest", "maximum", "max", "most", "peak", "worst", "fastest", "top"]):
         aggregation = "maximum"
     elif any(w in q for w in ["lowest", "minimum", "min", "least", "best"]):
         aggregation = "minimum"
@@ -544,8 +549,23 @@ def _extract_fleet_fields(query: str) -> dict:
         aggregation = "count"
     elif any(w in q for w in ["distribution", "breakdown", "types of alert"]):
         qtype = "alert_distribution"
+    elif "most" in q and ("alert" in q or "violation" in q) and "vehicle" not in q and "driver" not in q:
+        # If they specified an alert type (like "most overspeed alerts"), assume they want the top vehicle
+        alert_focus = extract_alert_focus(q)
+        if alert_focus is None:
+            qtype = "alert_distribution"
+        else:
+            metric = "alerts"
+            aggregation = "maximum"
+            subject = "vehicle"
+            filt = alert_focus
     elif metric == "alerts" and aggregation == "list":
         qtype = "alert_list"
+
+    if metric == "alerts" and filt is None:
+        alert_focus = extract_alert_focus(q)
+        if alert_focus:
+            filt = alert_focus
 
     return {
         "fleet_scope":       True,

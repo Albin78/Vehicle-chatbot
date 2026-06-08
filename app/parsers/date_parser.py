@@ -211,6 +211,7 @@ def is_time_range_in_query(
     patterns = [
 
         r"\b(today|yesterday)\b",
+        r"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
 
         r"\blast\s+\d+\s+days\b",
         r"\blst\s+\d+\s+days\b",
@@ -359,6 +360,23 @@ def extract_relative_time(
             str(last_month_start),
             str(last_month_end)
         )
+
+    # -----------------------------------------
+    # WEEKDAYS
+    # -----------------------------------------
+
+    weekdays = {
+        "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+        "friday": 4, "saturday": 5, "sunday": 6
+    }
+    for wd_str, wd_idx in weekdays.items():
+        if re.search(rf"\b{wd_str}\b", query):
+            days_ago = (today.weekday() - wd_idx) % 7
+            target_date = today - timedelta(days=days_ago)
+            return (
+                str(target_date),
+                str(target_date)
+            )
 
     return None
 
