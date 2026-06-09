@@ -47,19 +47,36 @@ def handle_fleet_service(intent, plan, company_id: int) -> dict:
     """
 
     # --------------------------------------------------
-    # 1. RESOLVE DATE RANGE
+    # 1. READ INTENT FIELDS
+    # --------------------------------------------------
+    metric      = (getattr(intent, "fleet_metric",      None) or "").lower()
+    aggregation = (getattr(intent, "fleet_aggregation",  None) or "maximum").lower()
+    subject     = (getattr(intent, "fleet_subject",      None) or "vehicle").lower()
+    filt        = (getattr(intent, "fleet_filter",       None) or "").lower()
+    qtype       = (getattr(intent, "fleet_query_type",   None) or "").lower()
+    metrics_list = getattr(intent, "metrics", [])
+
+    query_text = (getattr(intent, "query", "") or "").lower()
+    is_current_query = any(w in query_text for w in ["current", "currently", "now", "latest"])
+    valid_state_filters = {"", "on", "off", "open", "closed", "fastened", "unfastened", "enabled", "disabled"}
+    is_live_metrics_only = bool(metrics_list and not qtype and filt in valid_state_filters and metric in ("", "status"))
+
+    # --------------------------------------------------
+    # 2. RESOLVE DATE RANGE
     # --------------------------------------------------
     today     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     week_ago  = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
 
-    if plan.time_range:
+    if is_live_metrics_only or is_current_query:
+        from_date, to_date = today, today
+    elif plan.time_range:
         from_date, to_date = plan.time_range
     else:
         from_date, to_date = week_ago, today
 
     logger.info(
         f"[FLEET SERVICE] fleet_analytics | "
-        f"company={company_id} | {from_date} → {to_date}"
+        f"company={company_id} | {from_date} → {to_date} | live_only={is_live_metrics_only}"
     )
 
     # --------------------------------------------------
@@ -118,11 +135,24 @@ def _dispatch(intent, analyzer: FleetAnalyzer) -> dict:
     subject     = (getattr(intent, "fleet_subject",      None) or "vehicle").lower()
     filt        = (getattr(intent, "fleet_filter",       None) or "").lower()
     qtype       = (getattr(intent, "fleet_query_type",   None) or "").lower()
+    metrics_list = getattr(intent, "metrics", [])
 
     logger.info(
         f"[FLEET DISPATCH] metric={metric!r} agg={aggregation!r} "
-        f"subject={subject!r} filter={filt!r} qtype={qtype!r}"
+        f"subject={subject!r} filter={filt!r} qtype={qtype!r} metrics={metrics_list}"
     )
+
+    # --------------------------------------------------
+    # 0) Fleet metrics list (specific fields requested)
+    # --------------------------------------------------
+    valid_state_filters = {"", "on", "off", "open", "closed", "fastened", "unfastened", "enabled", "disabled"}
+    if metrics_list and not qtype and filt in valid_state_filters and metric in ("", "status"):
+        return {
+            "query_type": "fleet_metrics_list",
+            "metrics_requested": metrics_list,
+            "filter": filt,
+            "vehicles": analyzer.get_live_metrics_for_fleet(metrics_list),
+        }
 
     # --------------------------------------------------
     # A) Fleet overview / status counts

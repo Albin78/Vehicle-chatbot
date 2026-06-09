@@ -52,12 +52,11 @@ def query_system(data: QueryRequest):
             has_vehicle_pattern = bool(re.search(r"\d", q))
             in_domain_keywords = [
                 "vehicle", "truck", "car", "bus", "tanker", "can", "fleet", 
-                "alert", "overspeed", "violation", "summary", "report", "status", 
-                "latest", "current", "today", "yesterday", "fuel", "speed", "mileage", 
-                "distance", "battery", "ignition", "engine", "location", "latitude", 
-                "longitude", "odometer", "weight", "gsm", "signal", "wasl", "seatbelt", 
-                "door", "camera", "immobiliz", "driver", "group", "network", "satellite", 
-                "model", "make", "manufacturer", "imei"
+                "alert", "overspeed", "violation", "summary", "report", 
+                "fuel", "speed", "mileage", "distance", "battery", "ignition", "engine", 
+                "location", "latitude", "longitude", "odometer", "weight", "gsm", "signal", 
+                "wasl", "seatbelt", "door", "camera", "immobiliz", "driver", "group", 
+                "network", "satellite", "model", "make", "manufacturer", "imei"
             ]
             has_in_domain_kw = any(kw in q for kw in in_domain_keywords)
             if not has_vehicle_pattern and not has_in_domain_kw:
@@ -70,9 +69,9 @@ def query_system(data: QueryRequest):
         if not intent.vehicle_id and intent.source != "fleet_analytics":
             if is_general_query(data.query):
                 return {
-                    "response": "I am a specialized fleet management assistant. I can help you check vehicle status, track telemetry metrics, summarize reports, or view alerts for your fleet. Please provide a vehicle ID (e.g., 1832RXB) to query vehicle information."
+                    "response": "I am a VMS chatbot. I am only able to answer vehicle-related queries. I can help you check vehicle status, track telemetry metrics, summarize reports, or view alerts for your fleet."
                 }
-            return {"response": "Please provide a vehicle ID to proceed."}  
+            return {"response": "Please provide a valid vehicle ID to proceed."}  
 
         intent_validation = validate_intent(intent)
         if intent_validation["type"] == "error":

@@ -79,29 +79,126 @@ class FleetAnalyzer:
 
     def fleet_overview(self) -> dict:
         """Overall fleet snapshot counts — total/moving/idle/stopped/etc."""
-        return {
-            "total":        self.overall_count.get("total", 0),
-            "moving":       self.overall_count.get("moving", 0),
-            "idle":         self.overall_count.get("idle", 0),
-            "stopped":      self.overall_count.get("stopped", 0),
-            "out_network":  self.overall_count.get("outNetwork", 0),
-            "disconnected": self.overall_count.get("disconnected", 0),
+        counts = {
+            "total": len(self.live_records),
+            "moving": 0,
+            "idle": 0,
+            "stopped": 0,
+            "out_network": 0,
+            "disconnected": 0
         }
+        
+        for r in self.live_records:
+            raw_speed = r.get("speed")
+            raw_ign = r.get("ignitionOn")
+            v_status = r.get("vStatus")
+            
+            def is_invalid(val):
+                if val is None: return True
+                if isinstance(val, str) and val.strip().lower() in ("", "na", "null", "nan"): return True
+                return False
+                
+            valid_metrics = not is_invalid(raw_speed) and not is_invalid(raw_ign)
+            speed = 0.0
+            ignition = 0
+            
+            if valid_metrics:
+                try:
+                    speed = float(raw_speed)
+                except (ValueError, TypeError):
+                    valid_metrics = False
+                    
+                if raw_ign in (1, "1", True, "true", "True"):
+                    ignition = 1
+                elif raw_ign in (0, "0", False, "false", "False"):
+                    ignition = 0
+                else:
+                    try:
+                        ignition = int(float(raw_ign))
+                    except (ValueError, TypeError):
+                        valid_metrics = False
+            
+            if valid_metrics and speed > 0.0:
+                counts["moving"] += 1
+            elif valid_metrics and ignition == 1 and speed == 0.0:
+                counts["idle"] += 1
+            elif valid_metrics and ignition == 0 and speed == 0.0:
+                counts["stopped"] += 1
+            elif v_status == 4:
+                counts["out_network"] += 1
+            elif v_status == 0:
+                counts["disconnected"] += 1
+                
+        # Fallback to API if we have no live records (edge case)
+        if counts["total"] == 0:
+            return {
+                "total":        self.overall_count.get("total", 0),
+                "moving":       self.overall_count.get("moving", 0),
+                "idle":         self.overall_count.get("idle", 0),
+                "stopped":      self.overall_count.get("stopped", 0),
+                "out_network":  self.overall_count.get("outNetwork", 0),
+                "disconnected": self.overall_count.get("disconnected", 0),
+            }
+            
+        return counts
 
     def find_vehicles_by_status(self, status: str) -> list[dict]:
-        """List all vehicles matching a live vStatus label."""
-        target_code = VSTATUS_REVERSE.get(status.lower())
-        if target_code is None:
-            return []
+        """List all vehicles matching a live status by checking ignition and speed."""
+        status = status.lower()
+        target_code = VSTATUS_REVERSE.get(status)
 
         result = []
         for r in self.live_records:
-            if r.get("vStatus") == target_code:
+            raw_speed = r.get("speed")
+            raw_ign = r.get("ignitionOn")
+            
+            def is_invalid(val):
+                if val is None: return True
+                if isinstance(val, str) and val.strip().lower() in ("", "na", "null", "nan"): return True
+                return False
+                
+            valid_metrics = not is_invalid(raw_speed) and not is_invalid(raw_ign)
+            speed = 0.0
+            ignition = 0
+            
+            if valid_metrics:
+                try:
+                    speed = float(raw_speed)
+                except (ValueError, TypeError):
+                    valid_metrics = False
+                    
+                if raw_ign in (1, "1", True, "true", "True"):
+                    ignition = 1
+                elif raw_ign in (0, "0", False, "false", "False"):
+                    ignition = 0
+                else:
+                    try:
+                        ignition = int(float(raw_ign))
+                    except (ValueError, TypeError):
+                        valid_metrics = False
+                
+            is_match = False
+            
+            if status == "idle":
+                if valid_metrics and ignition == 1 and speed == 0.0:
+                    is_match = True
+            elif status == "stopped":
+                if valid_metrics and ignition == 0 and speed == 0.0:
+                    is_match = True
+            elif status == "moving":
+                if valid_metrics and speed > 0.0:
+                    is_match = True
+            else:
+                # fallback for disconnected, out_network
+                if target_code is not None and r.get("vStatus") == target_code:
+                    is_match = True
+                    
+            if is_match:
                 result.append({
                     "vehicleName": r.get("vehicleName"),
                     "numberPlate": r.get("numberPlate"),
                     "driverName":  _clean_driver(r.get("driverName")),
-                    "speed":       r.get("speed"),
+                    "speed":       speed,
                     "lastUpdated": r.get("lastUpdatedTime"),
                 })
         return result
@@ -116,6 +213,51 @@ class FleetAnalyzer:
             return {}
         top = max(candidates, key=lambda r: r["speed"])
         return _live_row_summary(top)
+
+    def get_live_metrics_for_fleet(self, metrics: list[str]) -> list[dict]:
+        """Extract requested metrics for all vehicles from live_records."""
+        result = []
+        
+        # Mapping from normalized metric names to live_records field names
+        metric_map = {
+            "speed": ["speed"],
+            "fuel_level": ["fuelLevel"],
+            "battery": ["batteryLevel"],
+            "ignition": ["ignitionOn"],
+            "engine_status": ["EngineStatus"],
+            "location": ["lat", "lon", "Location"],
+            "odometer_reading": ["odometerCurrentReading"],
+            "remote_immobilization": ["RemoteImmobilaztion", "RemoteImmobilaztionEnabled"],
+            "seatbelt": ["seatBelt", "SeatbeltEnabledIo"],
+            "door_open": ["doorOpen"],
+            "weight": ["Weight"],
+            "engine_temperature": ["engineTemperature"],
+            "engine_rpm": ["engineRpm"],
+            "mileage": ["mileage"],
+            "gsm_signal": ["GSMSignal"],
+            "satellites": ["satellites"],
+            "camera_status": ["CameraStatus"],
+            "camera_imei": ["CameraIMEI"],
+            "wasl": ["WaslIdentityNumber"],
+        }
+        
+        fields_to_extract = []
+        for m in metrics:
+            fields_to_extract.extend(metric_map.get(m, [m]))
+                
+        for r in self.live_records:
+            vehicle_data = {
+                "vehicleName": r.get("vehicleName"),
+                "numberPlate": r.get("numberPlate"),
+                "driverName": _clean_driver(r.get("driverName")),
+                "lastUpdated": r.get("lastUpdatedTime"),
+            }
+            for field in fields_to_extract:
+                vehicle_data[field] = r.get(field)
+                    
+            result.append(vehicle_data)
+                
+        return result
 
     # =================================================================
     # SECTION B — Operation Summary  (operationSummary.dataRows)

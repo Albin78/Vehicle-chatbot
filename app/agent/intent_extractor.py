@@ -153,6 +153,9 @@ ONLY if query asks:
 - current status
 - latest status
 
+9. vehicle_id
+MUST extract the vehicle identifier if present in the text (e.g. '1832 RXB', '2376 ABC', '73 RRR'). Do NOT extract generic words like 'truck' or 'car' as vehicle_id.
+
 =========================================================
 STRICT OUTPUT FORMAT
 =========================================================

@@ -300,8 +300,9 @@ def detect_source(
     # --------------------------------------------------
     if not vehicle_id:
         fleet_keywords = [
-            "which driver", "which vehicle", "who drove", "which truck", "which car", "which bus",
-            "all vehicles", "entire fleet", "fleet", "company",
+            "which driver", "which vehicle", "which vehicles", "who drove", "which truck", "which trucks", "which car", "which cars", "which bus", "which buses",
+            "all vehicles", "entire fleet", "fleet", "company", "which of our vehicles", "any vehicles", "are there any vehicles", "what vehicles", "what trucks", "what cars",
+            "vehicles with", "vehicles having", "vehicles that", "list vehicles",
             "most distance", "most idle", "least idle",
             "most moving", "highest speed", "lowest speed",
             "maximum speed", "minimum speed", "who was speeding", "who is speeding",
@@ -316,6 +317,9 @@ def detect_source(
             "vehicles are moving", "vehicles are stopped", "vehicles are idle",
         ]
         if any(kw in q for kw in fleet_keywords):
+            return "fleet_analytics"
+            
+        if any(w in q for w in ["how many", "total", "number of", "count"]) and any(w in q for w in ["alert", "violation", "overspeed", "idling", "overstay", "speeding"]):
             return "fleet_analytics"
             
         if "vehicles" in q and any(s in q for s in ["stopped", "moving", "idle", "disconnected", "out of network", "out network"]):
@@ -475,7 +479,8 @@ def _extract_fleet_fields(query: str) -> dict:
         fleet_scope, fleet_metric, fleet_aggregation,
         fleet_subject, fleet_filter, fleet_query_type
     """
-    q = query.lower()
+    import re
+    q = re.sub(r'[?.,!]', '', query.lower())
 
     # ---- SUBJECT: driver vs vehicle ---------------------------------
     if any(w in q for w in ["driver", "who drove", "which driver", "who was speeding", "who is speeding"]):
@@ -498,14 +503,18 @@ def _extract_fleet_fields(query: str) -> dict:
     # ---- METRIC -----------------------------------------------------
     metric = None
 
+    import re
     if any(w in q for w in ["alert", "alerts", "violation", "violations"]):
         metric = "alerts"
-    elif any(w in q for w in ["speed", "fast", "overspeed"]):
+    elif any(w in q for w in ["speed", "overspeed"]) or re.search(r'\bfast\b', q):
         metric = "speed"
     elif any(w in q for w in ["distance", "km", "kilometres", "mileage"]):
         metric = "distance"
     elif any(w in q for w in ["idle", "idling"]):
-        metric = "idle_time"
+        if any(w in q for w in ["most", "highest", "time", "least", "lowest"]):
+            metric = "idle_time"
+        else:
+            metric = "status"
     elif any(w in q for w in ["moving time", "drive time", "driving time"]):
         metric = "moving_time"
     elif any(w in q for w in ["engine hour", "engine hours"]):
@@ -529,14 +538,34 @@ def _extract_fleet_fields(query: str) -> dict:
         filt = "out_network"
     elif "disconnected" in q:
         filt = "disconnected"
-    elif "overspeed" in q or "over speed" in q:
+    elif metric == "alerts" and ("overspeed" in q or "over speed" in q):
         filt = "overspeed"
-    elif "seatbelt" in q or "seat belt" in q:
+    elif metric == "alerts" and ("seatbelt" in q or "seat belt" in q):
         filt = "seatbelt"
-    elif "afterhours" in q or "after hours" in q or "after-hours" in q:
+    elif metric == "alerts" and ("afterhours" in q or "after hours" in q or "after-hours" in q):
         filt = "afterhoursmovement"
-    elif "idling" in q and metric == "alerts":
+    elif metric == "alerts" and "idling" in q:
         filt = "idling"
+    elif " on " in q or q.endswith(" on") or q.startswith("on "):
+        filt = "on"
+    elif " off " in q or q.endswith(" off") or q.startswith("off "):
+        filt = "off"
+    elif " open " in q or q.endswith(" open") or q.startswith("open "):
+        filt = "open"
+    elif " close" in q:
+        filt = "closed"
+    elif any(w in q for w in [" unfastened", "not fastened"]) or ("without" in q and "fastened" in q):
+        filt = "unfastened"
+    elif " fastened" in q:
+        filt = "fastened"
+    elif any(w in q for w in ["without seatbelt", "without seat belt", "no seatbelt", "no seat belt", "not having seatbelt", "not having seat belt"]):
+        filt = "disabled"
+    elif any(w in q for w in ["having seatbelt", "having seat belt", "with seatbelt", "with seat belt"]):
+        filt = "enabled"
+    elif " enabled" in q:
+        filt = "enabled"
+    elif " disabled" in q:
+        filt = "disabled"
 
     # ---- QUERY TYPE (fine-grained routing hint) ---------------------
     qtype = None
@@ -632,10 +661,23 @@ def post_validate(
             )
              
         vehicle_cache = get_vehicle_cache(company_id=16)
-        vehicle_id = resolve_vehicle(query, vehicle_cache)
-        logger.info(f"Vehicle extracted from extraction function: {vehicle_id}")
+        resolved_id = resolve_vehicle(query, vehicle_cache)
         
-        # Explicitly overwrite to prevent LLM hallucinations from slipping through
+        if resolved_id:
+            vehicle_id = resolved_id
+        else:
+            llm_id = clean_data.get("vehicle_id")
+            vehicle_id = None
+            if llm_id:
+                import re
+                llm_alpha = re.sub(r'[^A-Za-z0-9]', '', llm_id).lower()
+                query_alpha = re.sub(r'[^A-Za-z0-9]', '', query).lower()
+                if llm_alpha and llm_alpha in query_alpha:
+                    vehicle_id = llm_id
+                
+        logger.info(f"Vehicle extracted from extraction function/LLM: {vehicle_id}")
+        
+        # Explicitly overwrite to prevent LLM hallucinations from slipping through, while preserving user typos
         clean_data["vehicle_id"] = vehicle_id
          
         extracted_metrics = extract_metrics(query)
