@@ -26,6 +26,13 @@ def format_fleet_analytics(result: dict) -> str:
             
         return v
 
+    def _format_driver(driver: any) -> str:
+        if not driver or str(driver).lower() in ("null", "na", "unknown", "none", "unassigned", "undefined"):
+            return ""
+        import re
+        d_str = " ".join(str(driver).split())
+        return re.sub(r'\(\s*(\d+)\s*\)', r'(ID: \1)', d_str)
+
     q_type = result.get("query_type")
     time_range = result.get("time_range", ("", ""))
     tr_str = ""
@@ -106,10 +113,8 @@ def format_fleet_analytics(result: dict) -> str:
             
         qualifier = "the highest" if q_type.startswith("top_") else "the lowest"
         
-        if driver and isinstance(driver, str):
-            driver = " ".join(driver.split())
-            
-        is_driver_unavailable = not driver or str(driver).lower() in ("null", "na", "unknown", "none", "unassigned", "undefined")
+        driver_formatted = _format_driver(driver)
+        is_driver_unavailable = not driver_formatted
         
         # Check if the metric value is 0 (meaning no activity occurred)
         if val in (0, "0", "0s", 0.0) and q_type.startswith("top_"):
@@ -117,7 +122,7 @@ def format_fleet_analytics(result: dict) -> str:
         
         if q_type in ("top_alert_vehicle", "top_alert_driver"):
             if q_type == "top_alert_driver":
-                driver_display = "driver details not currently available" if is_driver_unavailable else f"'{driver}'"
+                driver_display = "driver details not currently available" if is_driver_unavailable else f"'{driver_formatted}'"
                 if plate and plate != "Unknown" and plate != "Unknown Vehicle":
                     return (
                         f"Driver {driver_display} (in vehicle {plate}{group_str}) had {qualifier} number of {metric} "
@@ -129,20 +134,20 @@ def format_fleet_analytics(result: dict) -> str:
                         f"with a total of {val} {tr_str}."
                     )
             else:
-                driver_str = f" (driver details not currently available)" if is_driver_unavailable else f" (Driver: '{driver}')"
+                driver_str = f" (driver details not currently available)" if is_driver_unavailable else f" (Driver: '{driver_formatted}')"
                 return (
                     f"Vehicle {plate}{driver_str}{group_str} had {qualifier} number of {metric} "
                     f"with a total of {val} {tr_str}."
                 )
         else:
             if subject == "driver":
-                driver_display = "driver details not currently available" if is_driver_unavailable else f"'{driver}'"
+                driver_display = "driver details not currently available" if is_driver_unavailable else f"'{driver_formatted}'"
                 return (
                     f"Driver {driver_display} (in vehicle {plate}{group_str}) had {qualifier} {metric} "
                     f"with a value of {val} {tr_str}."
                 )
             else:
-                driver_str = f" (driver details not currently available)" if is_driver_unavailable else f" driven by '{driver}'"
+                driver_str = f" (driver details not currently available)" if is_driver_unavailable else f" driven by '{driver_formatted}'"
                 return (
                     f"Vehicle {plate}{driver_str}{group_str} had {qualifier} {metric} "
                     f"with a value of {val} {tr_str}."
@@ -312,6 +317,37 @@ def format_fleet_analytics(result: dict) -> str:
         if len(lines) > 30:
             lines = lines[:30] + [f"...and {len(vehicles) - 30} more vehicles."]
             
+        return header + "\n".join(lines)
+
+    if q_type and q_type.startswith("ranked_"):
+        ranked_list = result.get("ranked", [])
+        raw_metric = q_type.replace("ranked_", "")
+        
+        metric_map = {
+            "idleTime": "idle time",
+            "movingTime": "moving time",
+            "stopTime": "stop time",
+            "engineHours": "engine hours",
+            "maxSpeed": "maximum speed",
+            "speed": "maximum speed",
+            "distance": "distance traveled"
+        }
+        metric_display = metric_map.get(raw_metric, raw_metric.replace("_", " "))
+        
+        if not ranked_list:
+            return f"No ranking data available for {metric_display} {tr_str}."
+            
+        lines = []
+        for item in ranked_list:
+            rank = item.get("rank")
+            plate = item.get("numberPlate", "Unknown")
+            driver_formatted = _format_driver(item.get("driverName"))
+            driver_str = "" if not driver_formatted else f" (Driver: {driver_formatted})"
+            
+            val = _format_value("value", item.get("value", 0), raw_metric)
+            lines.append(f"{rank}. Vehicle {plate}{driver_str} - {val}")
+            
+        header = f"Here is the top {len(ranked_list)} ranking for highest {metric_display} {tr_str}:\n"
         return header + "\n".join(lines)
 
     # Fallback to key-value string but cleaned up

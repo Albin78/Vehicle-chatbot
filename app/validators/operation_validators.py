@@ -309,12 +309,12 @@ def detect_source(
             "fastest driver", "fastest drivers", "fastest vehicle", "fastest vehicles",
             "most overspeed", "most alerts", "most violations",
             "most alert", "most violation", "frequent alert", "most overstay",
-            "rank", "top vehicle", "top driver", "top drivers",
+            "rank", "top vehicle", "top driver", "top drivers", "top ", "most speed",
             "fleet status", "fleet overview", "overview", "overall status",
             "status of vehicle", "status of all vehicles",
             "how many vehicles", "list all vehicles",
-            "vehicles moving", "vehicles stopped", "vehicles idle",
-            "vehicles are moving", "vehicles are stopped", "vehicles are idle",
+            "vehicles moving", "vehicles stopped", "vehicles idle", "vehicles idling",
+            "vehicles are moving", "vehicles are stopped", "vehicles are idle", "vehicles are idling",
         ]
         if any(kw in q for kw in fleet_keywords):
             return "fleet_analytics"
@@ -322,7 +322,7 @@ def detect_source(
         if any(w in q for w in ["how many", "total", "number of", "count"]) and any(w in q for w in ["alert", "violation", "overspeed", "idling", "overstay", "speeding"]):
             return "fleet_analytics"
             
-        if "vehicles" in q and any(s in q for s in ["stopped", "moving", "idle", "disconnected", "out of network", "out network"]):
+        if "vehicles" in q and any(s in q for s in ["stopped", "moving", "idle", "idling", "disconnected", "out of network", "out network"]):
             return "fleet_analytics"
 
     # ALERT
@@ -489,12 +489,13 @@ def _extract_fleet_fields(query: str) -> dict:
         subject = "vehicle"
 
     # ---- AGGREGATION ------------------------------------------------
-    if any(w in q for w in ["highest", "maximum", "max", "most", "peak", "worst", "fastest", "top"]):
+    import re
+    if re.search(r'\btop\s+\d+\b', q) or any(w in q for w in ["rank", "list all", "all vehicles", "ranking"]):
+        aggregation = "list"
+    elif any(w in q for w in ["highest", "maximum", "max", "most", "peak", "worst", "fastest", "top"]):
         aggregation = "maximum"
     elif any(w in q for w in ["lowest", "minimum", "min", "least", "best"]):
         aggregation = "minimum"
-    elif any(w in q for w in ["rank", "list all", "all vehicles", "ranking"]):
-        aggregation = "list"
     elif any(w in q for w in ["how many", "count", "total alerts", "number of"]):
         aggregation = "count"
     else:
@@ -513,8 +514,6 @@ def _extract_fleet_fields(query: str) -> dict:
     elif any(w in q for w in ["idle", "idling"]):
         if any(w in q for w in ["most", "highest", "time", "least", "lowest"]):
             metric = "idle_time"
-        else:
-            metric = "status"
     elif any(w in q for w in ["moving time", "drive time", "driving time"]):
         metric = "moving_time"
     elif any(w in q for w in ["engine hour", "engine hours"]):
@@ -530,7 +529,7 @@ def _extract_fleet_fields(query: str) -> dict:
 
     if "moving" in q or "vehicles are moving" in q:
         filt = "moving"
-    elif "idle" in q and metric != "idle_time":
+    elif ("idle" in q or "idling" in q) and metric != "idle_time":
         filt = "idle"
     elif "stopped" in q:
         filt = "stopped"

@@ -142,6 +142,11 @@ def _dispatch(intent, analyzer: FleetAnalyzer) -> dict:
         f"subject={subject!r} filter={filt!r} qtype={qtype!r} metrics={metrics_list}"
     )
 
+    query_text = (getattr(intent, "query", "") or "").lower()
+    import re
+    match = re.search(r'\btop\s+(\d+)\b', query_text)
+    top_n = int(match.group(1)) if match else 10
+
     # --------------------------------------------------
     # 0) Fleet metrics list (specific fields requested)
     # --------------------------------------------------
@@ -237,7 +242,7 @@ def _dispatch(intent, analyzer: FleetAnalyzer) -> dict:
     if metric == "speed" and aggregation == "list":
         return {
             "query_type": "ranked_speed",
-            "ranked":     analyzer.rank_vehicles_by_metric("maxSpeed"),
+            "ranked":     analyzer.rank_vehicles_by_metric("maxSpeed", top_n=top_n),
         }
 
     # --------------------------------------------------
@@ -262,7 +267,7 @@ def _dispatch(intent, analyzer: FleetAnalyzer) -> dict:
         if aggregation == "list":
             return {
                 "query_type": f"ranked_{metric.replace(' ', '_')}",
-                "ranked":     analyzer.rank_vehicles_by_metric(api_field),
+                "ranked":     analyzer.rank_vehicles_by_metric(api_field, top_n=top_n),
             }
         # default — maximum
         top = analyzer.top_vehicle_by_metric(api_field, "maximum")

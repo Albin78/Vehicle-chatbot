@@ -118,7 +118,7 @@ class FleetAnalyzer:
                     except (ValueError, TypeError):
                         valid_metrics = False
             
-            if valid_metrics and speed > 0.0:
+            if valid_metrics and speed > 0.0 and ignition == 1:
                 counts["moving"] += 1
             elif valid_metrics and ignition == 1 and speed == 0.0:
                 counts["idle"] += 1
@@ -186,7 +186,7 @@ class FleetAnalyzer:
                 if valid_metrics and ignition == 0 and speed == 0.0:
                     is_match = True
             elif status == "moving":
-                if valid_metrics and speed > 0.0:
+                if valid_metrics and ignition == 1 and speed > 0.0:
                     is_match = True
             else:
                 # fallback for disconnected, out_network
