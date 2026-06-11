@@ -178,6 +178,7 @@ def _dispatch(intent, analyzer: FleetAnalyzer) -> dict:
         vehicles = analyzer.find_vehicles_by_status(filt)
         return {
             "query_type": "fleet_status_list",
+            "subject":    subject,
             "status":     filt,
             "count":      len(vehicles),
             "vehicles":   vehicles,

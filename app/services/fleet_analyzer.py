@@ -444,10 +444,15 @@ class FleetAnalyzer:
         
         counts = defaultdict(int)
         vehicles = {}
+        driver_distributions = defaultdict(lambda: defaultdict(int))
         
         for a in filtered:
-            driver = a.get("DriverName")
-            if not driver:
+            raw_driver = a.get("DriverName")
+            if not raw_driver:
+                continue
+            
+            driver = _clean_driver(raw_driver)
+            if driver == "Unassigned":
                 continue
                 
             counts[driver] += 1
@@ -455,6 +460,9 @@ class FleetAnalyzer:
             np = a.get("NumberPlate") or self.vn_to_np.get(vn, vn)
             if np:
                 vehicles[driver] = np
+                
+            alert_name = a.get("AlertName", "Unknown")
+            driver_distributions[driver][alert_name] += 1
                 
         if not counts:
             return {}
@@ -465,6 +473,7 @@ class FleetAnalyzer:
             "numberPlate": vehicles.get(driver, "Unknown Vehicle"),
             "alertCount":  count,
             "alertType":   alert_type or "all",
+            "alertDistribution": dict(driver_distributions[driver])
         }
 
     def most_alerts_vehicle(
@@ -475,6 +484,7 @@ class FleetAnalyzer:
         
         counts = defaultdict(int)
         drivers = {}
+        vehicle_distributions = defaultdict(lambda: defaultdict(int))
         
         for a in filtered:
             vn = a.get("VehicleName")
@@ -484,8 +494,12 @@ class FleetAnalyzer:
                 
             counts[np] += 1
             # Keep the latest or any driver name found for this vehicle in alerts
-            if a.get("DriverName"):
-                drivers[np] = a.get("DriverName")
+            raw_driver = a.get("DriverName")
+            if raw_driver:
+                drivers[np] = _clean_driver(raw_driver)
+                
+            alert_name = a.get("AlertName", "Unknown")
+            vehicle_distributions[np][alert_name] += 1
                 
         if not counts:
             return {}
@@ -496,6 +510,7 @@ class FleetAnalyzer:
             "driverName":  drivers.get(vehicle_np),
             "alertCount":  count,
             "alertType":   alert_type or "all",
+            "alertDistribution": dict(vehicle_distributions[vehicle_np])
         }
 
     def alert_count_by_type(self) -> dict:
@@ -522,10 +537,11 @@ class FleetAnalyzer:
         for a in filtered[:limit]:
             vn = a.get("VehicleName")
             np = a.get("NumberPlate") or self.vn_to_np.get(vn, vn)
+            driver_val = _clean_driver(a.get("DriverName")) if a.get("DriverName") else None
             result.append({
                 "vehicleName": vn,
                 "numberPlate": np,
-                "driverName":  a.get("DriverName"),
+                "driverName":  driver_val,
                 "alertName":   a.get("AlertName"),
                 "value":       a.get("CurrentValue") or a.get("OrginalValue"),
                 "limit":       a.get("Limit"),
@@ -542,7 +558,7 @@ class FleetAnalyzer:
 def _clean_driver(name: Optional[str]) -> str:
     if not name:
         return "Unassigned"
-    return name.strip()
+    return " ".join(name.split())
 
 
 def _live_row_summary(r: dict) -> dict:

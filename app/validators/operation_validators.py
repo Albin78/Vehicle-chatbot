@@ -302,7 +302,9 @@ def detect_source(
         fleet_keywords = [
             "which driver", "which vehicle", "which vehicles", "who drove", "which truck", "which trucks", "which car", "which cars", "which bus", "which buses",
             "all vehicles", "entire fleet", "fleet", "company", "which of our vehicles", "any vehicles", "are there any vehicles", "what vehicles", "what trucks", "what cars",
+            "what drivers", "any drivers", "list drivers", "all drivers",
             "vehicles with", "vehicles having", "vehicles that", "list vehicles",
+            "drivers with", "drivers having", "drivers that", "drivers who", "drivers which",
             "most distance", "most idle", "least idle",
             "most moving", "highest speed", "lowest speed",
             "maximum speed", "minimum speed", "who was speeding", "who is speeding",
@@ -315,6 +317,8 @@ def detect_source(
             "how many vehicles", "list all vehicles",
             "vehicles moving", "vehicles stopped", "vehicles idle", "vehicles idling",
             "vehicles are moving", "vehicles are stopped", "vehicles are idle", "vehicles are idling",
+            "drivers moving", "drivers stopped", "drivers idle", "drivers idling",
+            "drivers are moving", "drivers are stopped", "drivers are idle", "drivers are idling",
         ]
         if any(kw in q for kw in fleet_keywords):
             return "fleet_analytics"
@@ -322,7 +326,7 @@ def detect_source(
         if any(w in q for w in ["how many", "total", "number of", "count"]) and any(w in q for w in ["alert", "violation", "overspeed", "idling", "overstay", "speeding"]):
             return "fleet_analytics"
             
-        if "vehicles" in q and any(s in q for s in ["stopped", "moving", "idle", "idling", "disconnected", "out of network", "out network"]):
+        if any(w in q for w in ["vehicles", "drivers", "trucks", "cars"]) and any(s in q for s in ["stopped", "moving", "idle", "idling", "disconnected", "out of network", "out network"]):
             return "fleet_analytics"
 
     # ALERT
