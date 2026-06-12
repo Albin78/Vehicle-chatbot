@@ -444,6 +444,7 @@ class FleetAnalyzer:
         
         counts = defaultdict(int)
         vehicles = {}
+        groups = {}
         driver_distributions = defaultdict(lambda: defaultdict(int))
         
         for a in filtered:
@@ -458,8 +459,11 @@ class FleetAnalyzer:
             counts[driver] += 1
             vn = a.get("VehicleName")
             np = a.get("NumberPlate") or self.vn_to_np.get(vn, vn)
+            gn = a.get("GroupName")
             if np:
                 vehicles[driver] = np
+            if gn and str(gn).strip() not in ("", "None", "Unknown"):
+                groups[driver] = gn
                 
             alert_name = a.get("AlertName", "Unknown")
             driver_distributions[driver][alert_name] += 1
@@ -471,6 +475,7 @@ class FleetAnalyzer:
         return {
             "driverName":  driver,
             "numberPlate": vehicles.get(driver, "Unknown Vehicle"),
+            "groupName":   groups.get(driver, "Unknown"),
             "alertCount":  count,
             "alertType":   alert_type or "all",
             "alertDistribution": dict(driver_distributions[driver])
@@ -484,6 +489,7 @@ class FleetAnalyzer:
         
         counts = defaultdict(int)
         drivers = {}
+        groups = {}
         vehicle_distributions = defaultdict(lambda: defaultdict(int))
         
         for a in filtered:
@@ -493,6 +499,11 @@ class FleetAnalyzer:
                 continue
                 
             counts[np] += 1
+            
+            gn = a.get("GroupName")
+            if gn and str(gn).strip() not in ("", "None", "Unknown"):
+                groups[np] = gn
+                
             # Keep the latest or any driver name found for this vehicle in alerts
             raw_driver = a.get("DriverName")
             if raw_driver:
@@ -508,9 +519,39 @@ class FleetAnalyzer:
         return {
             "numberPlate": vehicle_np,
             "driverName":  drivers.get(vehicle_np),
+            "groupName":   groups.get(vehicle_np, "Unknown"),
             "alertCount":  count,
             "alertType":   alert_type or "all",
             "alertDistribution": dict(vehicle_distributions[vehicle_np])
+        }
+
+    def most_alerts_group(
+        self, alert_type: Optional[str] = None
+    ) -> dict:
+        """Which group had the most alerts (of a given type)?"""
+        filtered = self.filter_alerts_by_type(alert_type)
+        
+        counts = defaultdict(int)
+        group_distributions = defaultdict(lambda: defaultdict(int))
+        
+        for a in filtered:
+            gn = a.get("GroupName")
+            if not gn or str(gn).strip() in ("", "None", "Unknown"):
+                continue
+                
+            counts[gn] += 1
+            alert_name = a.get("AlertName", "Unknown")
+            group_distributions[gn][alert_name] += 1
+                
+        if not counts:
+            return {}
+            
+        group_name, count = max(counts.items(), key=lambda x: x[1])
+        return {
+            "groupName":   group_name,
+            "alertCount":  count,
+            "alertType":   alert_type or "all",
+            "alertDistribution": dict(group_distributions[group_name])
         }
 
     def alert_count_by_type(self) -> dict:

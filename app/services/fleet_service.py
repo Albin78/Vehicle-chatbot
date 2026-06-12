@@ -74,6 +74,12 @@ def handle_fleet_service(intent, plan, company_id: int) -> dict:
     else:
         from_date, to_date = week_ago, today
 
+    time_range_altered_to_week = False
+    if not is_live_metrics_only and not is_current_query and from_date == today and to_date == today:
+        # For historical operation summaries requested strictly for today, back off to a week
+        from_date, to_date = week_ago, today
+        time_range_altered_to_week = True
+
     logger.info(
         f"[FLEET SERVICE] fleet_analytics | "
         f"company={company_id} | {from_date} → {to_date} | live_only={is_live_metrics_only}"
@@ -113,6 +119,7 @@ def handle_fleet_service(intent, plan, company_id: int) -> dict:
     result = _dispatch(intent, analyzer)
 
     result["time_range"]  = (from_date, to_date)
+    result["time_range_altered_to_week"] = time_range_altered_to_week
     result["type"]        = "fleet_analytics"
 
     logger.info(f"[FLEET SERVICE] Result: {result}")
@@ -201,12 +208,17 @@ def _dispatch(intent, analyzer: FleetAnalyzer) -> dict:
             "distribution": analyzer.alert_count_by_type(),
         }
 
-    # Which driver/vehicle had most alerts?
+    # Which driver/vehicle/group had most alerts?
     if metric == "alerts" and aggregation in {"maximum", "most"}:
         if subject == "driver":
             return {
                 "query_type": "top_alert_driver",
                 **analyzer.most_alerts_driver(filt or None),
+            }
+        elif subject == "group":
+            return {
+                "query_type": "top_alert_group",
+                **analyzer.most_alerts_group(filt or None),
             }
         return {
             "query_type": "top_alert_vehicle",

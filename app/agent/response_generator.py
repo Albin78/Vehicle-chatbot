@@ -39,6 +39,7 @@ def generate_response(result, intent):
             "- Strictly output ONLY the final report itself and absolutely nothing else.\n"
             "- Use clean Markdown bullet points.\n"
             "- DRIVER RULE: If the driver is 'null', 'NA', 'None', 'Unknown', or 'Unassigned', state that 'driver details are not currently available' rather than 'Driver NA', 'Driver null', or 'Driver Unknown'.\n"
+            "- VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name' (e.g. do not change 'Vehicle 1342 ABC' into 'Vehicle ID: 1342, Name: ABC'). Treat the entire identifier as a single immutable string.\n"
             "\n"
             "<example>\n"
             "INPUT: Vehicle ABC-123 of type Truck belongs to group Alpha Fleet. For the period Oct 01 to Oct 02. Total distance traveled was 150 km. Total moving time was 03:00:00. Total idle time was 00:30:00. Total stop time was 44:30:00. Highest speed recorded was 80 km/h on Oct 02. Average daily maximum speed across 2 days was 77.5 km/h. On Oct 01, distance traveled was 50 km, maximum speed reached 75 km/h, moving time was 01:00:00, idle time was 00:10:00, and stop time was 22:50:00. On Oct 02, distance traveled was 100 km, maximum speed reached 80 km/h, moving time was 02:00:00, idle time was 00:20:00, and stop time was 21:40:00.\n"
@@ -73,6 +74,7 @@ def generate_response(result, intent):
             "- Use clean Markdown bullet points.\n"
             "- For descriptive fields (camera, seatbelt, ignition, door, immobilization, tanker_status, gsm_signal), preserve the exact descriptive phrase from INPUT.\n"
             "- DRIVER RULE: If the driver is 'null', 'NA', 'None', 'Unknown', or 'Unassigned', output 'driver details are not currently available' instead of 'driver is NA', 'driver is null', or 'driver assigned is Unknown'.\n"
+            "- VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name' (e.g. do not change 'Vehicle 1342 ABC' into 'Vehicle ID: 1342, Name: ABC'). Treat the entire identifier as a single immutable string.\n"
             "\n"
             "<example>\n"
             "INPUT: Vehicle 1832 RXB is currently stopped with the engine off. Fuel level is 0.0%. Vehicle has a fuel capacity of 400 L. The tanker has a fuel capacity of 8000 L. Tanker fuel level is 0.0%. Battery voltage is 13.5 V. Vehicle 1832 RXB is classified as a can. Vehicle type is Pick Up. Manufacturer is Isuzu and model is DOUBLE CABIN 2022. Vehicle is a can and belongs to Flames Hydraulic Co, Info, Others, Test Group. Driver assigned is Vipin. The ignition is off. The seatbelt is equipped but not fastened. Vehicle supports remote immobilization and is not currently remotely immobilized. Vehicle 1832 RXB has a good GSM signal with value of 5. Location map: https://www.google.com/maps?q=26.4325149,50.1023883. Last updated May 26, 2026 06:55 AM UTC. Camera IMEI is 940076337414. IMEI is 868963040937609. Odometer reading is 12345.6 km. camera is equipped with 1 camera channel.\n"
@@ -99,6 +101,7 @@ def generate_response(result, intent):
             "3. PRESERVE LISTS: If the INPUT contains a list of vehicles (e.g., lines starting with '- Vehicle'), you MUST preserve them as a clean bulleted list. Do not compress them into a paragraph.\n"
             "4. NO QUOTES: Do not add quotation marks around vehicle names, group names, driver names, metrics, or statuses.\n"
             "5. DRIVERS & ENTITIES: Treat driver names and group names as single immutable entities. If driver details are explicitly present in the INPUT and the driver is 'null', 'NA', 'None', 'Unknown', or 'Unassigned', output 'driver details are not currently available'. If drivers are NOT mentioned in the INPUT, DO NOT mention drivers at all in your OUTPUT.\n"
+            "6. VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name' (e.g. do not change 'Vehicle 1342 ABC' into 'Vehicle ID: 1342, Name: ABC'). Treat the entire identifier as a single immutable string.\n"
             "\n"
             "Strictly output ONLY the polished response and absolutely nothing else.\n"
             "\n"
@@ -119,6 +122,7 @@ def generate_response(result, intent):
             "  * If Speed is greater than '0 km/h', describe it as 'moving' (e.g. 'is currently moving at 45 km/h').\n"
             "- For descriptive fields (camera, seatbelt, ignition, door, immobilization, tanker_status, gsm_signal), preserve the exact descriptive phrase from INPUT.\n"
             "- DRIVER RULE: If driver details are explicitly present in the INPUT and the driver is 'null', 'NA', 'None', 'Unknown', or 'Unassigned', output 'driver details are not currently available'. Do not mention drivers at all if they are not included in the INPUT.\n"
+            "- VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name' (e.g. do not change 'Vehicle 1342 ABC' into 'Vehicle ID: 1342, Name: ABC'). Treat the entire identifier as a single immutable string.\n"
             "\n"
             "<example>\n"
             "INPUT: For vehicle 1832 RXB, vehicle is a can.\n"
@@ -222,6 +226,10 @@ def generate_response(result, intent):
             orig_str = f"for the period from {orig_f_fmt} to {orig_t_fmt}"
             
         note = f"\n\n*Note: No alerts were found {orig_str}. To provide useful context, the system has dynamically backed off to show alerts found in the past period from {used_f_fmt} to {used_t_fmt}.*"
+        response += note
+
+    if result.get("time_range_altered_to_week"):
+        note = "\n\n*Note: As today's operation summary data may not be fully available yet, the system has backed off to show data from the past week.*"
         response += note
 
     return response

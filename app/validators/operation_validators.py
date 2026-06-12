@@ -305,13 +305,18 @@ def detect_source(
             "what drivers", "any drivers", "list drivers", "all drivers",
             "vehicles with", "vehicles having", "vehicles that", "list vehicles",
             "drivers with", "drivers having", "drivers that", "drivers who", "drivers which",
-            "most distance", "most idle", "least idle",
-            "most moving", "highest speed", "lowest speed",
-            "maximum speed", "minimum speed", "who was speeding", "who is speeding",
-            "fastest driver", "fastest drivers", "fastest vehicle", "fastest vehicles",
-            "most overspeed", "most alerts", "most violations",
+            "most distance", "least distance", "highest distance", "lowest distance",
+            "most idle", "least idle", "most idle time", "least idle time",
+            "most moving", "least moving", "most moving time", "least moving time",
+            "most stop time", "least stop time", "most engine hours", "least engine hours",
+            "highest speed", "lowest speed", "maximum speed", "minimum speed",
+            "who was speeding", "who is speeding",
+            "fastest driver", "fastest drivers", "fastest vehicle", "fastest vehicles", "fastest truck", "fastest car", "fastest bus",
+            "slowest driver", "slowest drivers", "slowest vehicle", "slowest vehicles", "slowest truck", "slowest car", "slowest bus",
+            "most overspeed", "most alerts", "most violations", "least alerts", "least violations",
             "most alert", "most violation", "frequent alert", "most overstay",
-            "rank", "top vehicle", "top driver", "top drivers", "top ", "most speed",
+            "rank", "top vehicle", "top driver", "top drivers", "top ", "most speed", "least speed",
+            "which group", "groups with", "what group", "what groups", "most alert group", "list groups", "all groups",
             "fleet status", "fleet overview", "overview", "overall status",
             "status of vehicle", "status of all vehicles",
             "how many vehicles", "list all vehicles",
@@ -486,8 +491,10 @@ def _extract_fleet_fields(query: str) -> dict:
     import re
     q = re.sub(r'[?.,!]', '', query.lower())
 
-    # ---- SUBJECT: driver vs vehicle ---------------------------------
-    if any(w in q for w in ["driver", "who drove", "which driver", "who was speeding", "who is speeding"]):
+    # ---- SUBJECT: driver vs vehicle vs group ------------------------
+    if any(w in q for w in ["group", "which group", "groups"]):
+        subject = "group"
+    elif any(w in q for w in ["driver", "who drove", "which driver", "who was speeding", "who is speeding"]):
         subject = "driver"
     else:
         subject = "vehicle"
@@ -498,7 +505,7 @@ def _extract_fleet_fields(query: str) -> dict:
         aggregation = "list"
     elif any(w in q for w in ["highest", "maximum", "max", "most", "peak", "worst", "fastest", "top"]):
         aggregation = "maximum"
-    elif any(w in q for w in ["lowest", "minimum", "min", "least", "best"]):
+    elif any(w in q for w in ["lowest", "minimum", "min", "least", "best", "slowest"]):
         aggregation = "minimum"
     elif any(w in q for w in ["how many", "count", "total alerts", "number of"]):
         aggregation = "count"
@@ -511,15 +518,17 @@ def _extract_fleet_fields(query: str) -> dict:
     import re
     if any(w in q for w in ["alert", "alerts", "violation", "violations"]):
         metric = "alerts"
-    elif any(w in q for w in ["speed", "overspeed"]) or re.search(r'\bfast\b', q):
+    elif any(w in q for w in ["speed", "overspeed", "fastest", "slowest"]) or re.search(r'\bfast\b', q):
         metric = "speed"
     elif any(w in q for w in ["distance", "km", "kilometres", "mileage"]):
         metric = "distance"
     elif any(w in q for w in ["idle", "idling"]):
         if any(w in q for w in ["most", "highest", "time", "least", "lowest"]):
             metric = "idle_time"
-    elif any(w in q for w in ["moving time", "drive time", "driving time"]):
+    elif any(w in q for w in ["moving time", "drive time", "driving time", "most moving", "least moving"]):
         metric = "moving_time"
+    elif any(w in q for w in ["stop time", "stopped time", "most stop", "least stop"]):
+        metric = "stop_time"
     elif any(w in q for w in ["engine hour", "engine hours"]):
         metric = "engine_hours"
     elif any(w in q for w in [
@@ -531,11 +540,11 @@ def _extract_fleet_fields(query: str) -> dict:
     # ---- FILTER (live status or alert type) -------------------------
     filt = None
 
-    if "moving" in q or "vehicles are moving" in q:
+    if ("moving" in q or "vehicles are moving" in q) and metric != "moving_time":
         filt = "moving"
     elif ("idle" in q or "idling" in q) and metric != "idle_time":
         filt = "idle"
-    elif "stopped" in q:
+    elif "stopped" in q and metric != "stop_time":
         filt = "stopped"
     elif "out of network" in q or "out network" in q:
         filt = "out_network"
@@ -581,7 +590,7 @@ def _extract_fleet_fields(query: str) -> dict:
         aggregation = "count"
     elif any(w in q for w in ["distribution", "breakdown", "types of alert"]):
         qtype = "alert_distribution"
-    elif "most" in q and ("alert" in q or "violation" in q) and "vehicle" not in q and "driver" not in q:
+    elif "most" in q and ("alert" in q or "violation" in q) and "vehicle" not in q and "driver" not in q and "group" not in q:
         # If they specified an alert type (like "most overspeed alerts"), assume they want the top vehicle
         alert_focus = extract_alert_focus(q)
         if alert_focus is None:
