@@ -355,6 +355,13 @@ def format_fleet_analytics(result: dict) -> str:
         }
         metric_display = metric_map.get(raw_metric, raw_metric.replace("_", " "))
         
+        if raw_metric == "alerts":
+            alert_type = result.get("alertType", "all")
+            if alert_type != "all":
+                metric_display = f"{alert_type} alerts"
+            else:
+                metric_display = "alerts"
+        
         if not ranked_list:
             return f"No ranking data available for {metric_display} {tr_str}."
             
@@ -366,9 +373,9 @@ def format_fleet_analytics(result: dict) -> str:
             driver_str = "" if not driver_formatted else f" (Driver: {driver_formatted})"
             
             val = _format_value("value", item.get("value", 0), raw_metric)
-            lines.append(f"{rank}. Vehicle {plate}{driver_str} - {val}")
+            lines.append(f"- Vehicle {plate}{driver_str} : {val} (Rank: {rank})")
             
-        header = f"Here is the top {len(ranked_list)} ranking for highest {metric_display} {tr_str}:\n"
+        header = f"Here is the ranking for highest {metric_display} {tr_str}:\n"
         return header + "\n".join(lines)
 
     # Fallback to key-value string but cleaned up

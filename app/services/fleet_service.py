@@ -167,19 +167,7 @@ def _dispatch(intent, analyzer: FleetAnalyzer) -> dict:
         }
 
     # --------------------------------------------------
-    # A) Fleet overview / status counts
-    # --------------------------------------------------
-    if qtype == "fleet_overview" or metric == "status":
-        return {
-            "query_type": "fleet_overview",
-            "overview":   analyzer.fleet_overview(),
-            "totals":     analyzer.fleet_operation_totals(),
-            "alerts_total": analyzer.alerts_total,
-            "alerts_distribution": analyzer.alert_count_by_type(),
-        }
-
-    # --------------------------------------------------
-    # B) List vehicles by live status  (moving/idle/stopped…)
+    # A) List vehicles by live status (moving/idle/stopped…)
     # --------------------------------------------------
     if filt in {"moving", "idle", "stopped", "out_network", "disconnected"}:
         vehicles = analyzer.find_vehicles_by_status(filt)
@@ -189,6 +177,18 @@ def _dispatch(intent, analyzer: FleetAnalyzer) -> dict:
             "status":     filt,
             "count":      len(vehicles),
             "vehicles":   vehicles,
+        }
+
+    # --------------------------------------------------
+    # B) Fleet overview / status counts
+    # --------------------------------------------------
+    if qtype == "fleet_overview" or metric == "status":
+        return {
+            "query_type": "fleet_overview",
+            "overview":   analyzer.fleet_overview(),
+            "totals":     analyzer.fleet_operation_totals(),
+            "alerts_total": analyzer.alerts_total,
+            "alerts_distribution": analyzer.alert_count_by_type(),
         }
 
     # --------------------------------------------------
@@ -223,6 +223,15 @@ def _dispatch(intent, analyzer: FleetAnalyzer) -> dict:
         return {
             "query_type": "top_alert_vehicle",
             **analyzer.most_alerts_vehicle(filt or None),
+        }
+
+    # Ranked alerts (Top N vehicles)
+    is_ranking_query = bool(re.search(r'\btop\b', query_text) or re.search(r'\brank', query_text))
+    if metric == "alerts" and (aggregation == "list" or qtype == "alert_list") and is_ranking_query:
+        return {
+            "query_type": "ranked_alerts",
+            "alertType":  filt or "all",
+            "ranked":     analyzer.rank_vehicles_by_alerts(filt or None, top_n=top_n),
         }
 
     # List alert events

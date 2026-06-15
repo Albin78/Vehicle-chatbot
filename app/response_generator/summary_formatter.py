@@ -13,7 +13,8 @@ MAX_DAILY_REPORTS = 5
 METRIC_UNITS = {
 
     "speed": "km/h",
-    "distance": "km"
+    "distance": "km",
+    "distance_travelled": "km"
 
 }
 
@@ -295,31 +296,32 @@ def build_daily_breakdown(daily_reports):
 
 def format_summary_metric(result):
 
-    metric = result.get("metric")
+    metrics_data = result.get("metrics", {})
+    metric_aggs = result.get("metric_aggregations", {})
+    global_agg = result.get("aggregation") or "requested"
+    formatted_range = format_time_generate(result.get("time_range"))
+    vehicle_id = result.get("vehicle")
+    
+    parts = []
+    for metric, value in metrics_data.items():
+        unit = METRIC_UNITS.get(metric, "")
+        
+        # Use specific aggregation if available, else fallback
+        specific_agg = metric_aggs.get(metric) or global_agg
+        
+        # Override aggregation word for distance and time sum
+        agg_word = specific_agg
+        if metric in ["distance", "distance_travelled", "idle_time", "moving_time", "stop_time"] and specific_agg != "average":
+            agg_word = "total"
+            
+        parts.append(f"{agg_word} {metric} was {value} {unit}".strip())
 
-    aggregation = result.get(
-        "aggregation"
-    )
-
-    value = result.get("value")
-
-    unit = METRIC_UNITS.get(
-        metric,
-        ""
-    )
-
-    formatted_range = format_time_generate(
-        result.get("time_range")
-    )
+    metrics_str = ", and ".join(parts)
 
     return (
-
-        f"For vehicle "
-        f"{result.get('vehicle')}, "
-        f"the {aggregation} {metric} "
-        f"during {formatted_range} "
-        f"was {value} {unit}."
-
+        f"For vehicle {vehicle_id}, "
+        f"during {formatted_range}, "
+        f"{metrics_str}."
     )
 
 

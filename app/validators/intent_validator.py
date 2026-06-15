@@ -91,7 +91,11 @@ VALID_METRICS = {
 
     "model_name",
 
-    "tanker_status"
+    "tanker_status",
+
+    "idle_time",
+    "moving_time",
+    "stop_time"
 }
 
 
@@ -100,6 +104,16 @@ METRIC_SYNONYMS = {
     "speed": "speed",
     "current speed": "speed",
     "vehicle speed": "speed",
+    
+    "idle time": "idle_time",
+    "idling time": "idle_time",
+    
+    "moving time": "moving_time",
+    "drive time": "moving_time",
+    "driving time": "moving_time",
+    
+    "stop time": "stop_time",
+    "stopped time": "stop_time",
     "running speed": "speed",
     "live speed": "speed",
     "speed status": "speed",

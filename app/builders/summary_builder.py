@@ -6,13 +6,38 @@ from app.utils.response_utils import error_response
 SUPPORTED_METRICS = {
     "speed": "maxSpeed",
     "distance": "distance",
+    "distance_travelled": "distance",
     "idle_time": "idleTime",
     "moving_time": "movingTime",
     "stop_time": "stopTime"
 }
 
 
-def compute_metric(rows, metric, aggregation):
+def parse_time_str(time_val):
+    if time_val is None:
+        return 0
+    val_str = str(time_val)
+    if ":" in val_str:
+        try:
+            parts = val_str.split(":")
+            if len(parts) >= 3:
+                return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+            elif len(parts) == 2:
+                return int(parts[0]) * 60 + float(parts[1])
+        except Exception:
+            pass
+    try:
+        return float(time_val)
+    except Exception:
+        return 0
+
+def format_seconds(seconds):
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+def compute_metric(rows, metric, aggregation, query_string=""):
 
     field = SUPPORTED_METRICS.get(metric)
 
@@ -20,6 +45,8 @@ def compute_metric(rows, metric, aggregation):
         return None
 
     values = []
+    
+    is_time_metric = metric in ["idle_time", "moving_time", "stop_time"]
 
     for row in rows:
 
@@ -30,22 +57,58 @@ def compute_metric(rows, metric, aggregation):
 
         if field == "distance":
             value = float(value)
+        elif is_time_metric:
+            value = parse_time_str(value)
 
         values.append(value)
 
     if not values:
         return None
 
-    if aggregation == "maximum":
-        return round(max(values), 2)
+    specific_agg = aggregation
+    if query_string:
+        q = query_string.lower()
+        metric_words = metric.replace("_", " ")
+        
+        if f"average {metric_words}" in q or f"avg {metric_words}" in q:
+            specific_agg = "average"
+        elif f"highest {metric_words}" in q or f"max {metric_words}" in q or f"maximum {metric_words}" in q:
+            specific_agg = "maximum"
+        elif f"total {metric_words}" in q:
+            specific_agg = "total"
+            
+        if metric == "speed":
+            if "average speed" in q: specific_agg = "average"
+            elif "highest speed" in q or "max speed" in q: specific_agg = "maximum"
+            
+        if metric in ["distance", "distance_travelled"]:
+            if "average distance" in q: specific_agg = "average"
+            elif "total distance" in q: specific_agg = "total"
 
-    if aggregation == "minimum":
-        return round(min(values), 2)
-
-    if aggregation == "average":
-        return round(sum(values) / len(values), 2)
-
-    return round(values[-1], 2)
+    # Determine default behavior
+    if metric in ["distance", "distance_travelled"] and specific_agg != "average":
+        result = sum(values)
+        if specific_agg not in ["maximum", "minimum"]:
+            specific_agg = "total"
+    elif is_time_metric and specific_agg != "average":
+        result = sum(values)
+        if specific_agg not in ["maximum", "minimum"]:
+            specific_agg = "total"
+    elif specific_agg == "maximum":
+        result = max(values)
+    elif specific_agg == "minimum":
+        result = min(values)
+    elif specific_agg == "average":
+        result = sum(values) / len(values)
+    else:
+        result = sum(values) if specific_agg == "total" else values[-1]
+        
+    if is_time_metric:
+        val = format_seconds(result)
+    else:
+        val = round(result, 2)
+        
+    return {"value": val, "aggregation": specific_agg}
 
 
 def build_daily_reports(rows):
@@ -166,31 +229,35 @@ def build_summary_response(intent, api_result):
 
     if intent.metrics:
 
-        metric = intent.metrics[0]
+        metrics_data = {}
+        metric_aggregations = {}
+        query_str = getattr(intent, "query", "") or ""
+        
+        for m in intent.metrics:
+            if m in SUPPORTED_METRICS:
+                res = compute_metric(rows, m, intent.aggregation, query_str)
+                if res is not None:
+                    metrics_data[m] = res["value"]
+                    metric_aggregations[m] = res["aggregation"]
 
-        value = compute_metric(
-            rows,
-            metric,
-            intent.aggregation
-        )
+        # Only return a metric summary if we actually computed at least one metric
+        if metrics_data and not intent.summary_requested:
+            return {
 
-        return {
+                "type": "summary_metric",
 
-            "type": "summary_metric",
+                "vehicle":
+                    intent.vehicle_id,
 
-            "vehicle":
-                intent.vehicle_id,
+                "metrics": metrics_data,
+                "metric_aggregations": metric_aggregations,
 
-            "metric": metric,
+                "aggregation":
+                    intent.aggregation,
 
-            "aggregation":
-                intent.aggregation,
-
-            "value": value,
-
-            "time_range":
-                intent.time_range
-        }
+                "time_range":
+                    intent.time_range
+            }
 
     # -----------------------------
     # FULL SUMMARY QUERY

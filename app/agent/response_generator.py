@@ -228,7 +228,7 @@ def generate_response(result, intent):
         note = f"\n\n*Note: No alerts were found {orig_str}. To provide useful context, the system has dynamically backed off to show alerts found in the past period from {used_f_fmt} to {used_t_fmt}.*"
         response += note
 
-    if result.get("time_range_altered_to_week"):
+    if result.get("time_range_altered_to_week") and result.get("type") in ["summary", "summary_metric"]:
         note = "\n\n*Note: As today's operation summary data may not be fully available yet, the system has backed off to show data from the past week.*"
         response += note
 

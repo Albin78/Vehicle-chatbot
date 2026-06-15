@@ -34,7 +34,8 @@ class QueryIntent(BaseModel):
         Literal[
             "minimum",
             "maximum",
-            "average"
+            "average",
+            "total"
         ]
     ] = None
 

@@ -524,7 +524,53 @@ class FleetAnalyzer:
             "alertType":   alert_type or "all",
             "alertDistribution": dict(vehicle_distributions[vehicle_np])
         }
+    def rank_vehicles_by_alerts(
+        self, alert_type: Optional[str] = None, top_n: int = 10
+    ) -> list[dict]:
+        """Rank vehicles by the number of alerts (optionally filtered by type)."""
+        filtered = self.filter_alerts_by_type(alert_type)
+        
+        counts = defaultdict(int)
+        drivers = {}
+        groups = {}
+        vehicle_distributions = defaultdict(lambda: defaultdict(int))
+        
+        for a in filtered:
+            vn = a.get("VehicleName")
+            np = a.get("NumberPlate") or self.vn_to_np.get(vn, vn)
+            if not np:
+                continue
+                
+            counts[np] += 1
+            
+            gn = a.get("GroupName")
+            if gn and str(gn).strip() not in ("", "None", "Unknown"):
+                groups[np] = gn
+                
+            raw_driver = a.get("DriverName")
+            if raw_driver:
+                drivers[np] = _clean_driver(raw_driver)
+                
+            alert_name = a.get("AlertName", "Unknown")
+            vehicle_distributions[np][alert_name] += 1
 
+        rows = sorted(
+            counts.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )[:top_n]
+
+        return [
+            {
+                "rank":        i + 1,
+                "numberPlate": np,
+                "driverName":  drivers.get(np, "Unknown"),
+                "groupName":   groups.get(np, "Unknown"),
+                "value":       count,
+                "alertDistribution": dict(vehicle_distributions[np])
+            }
+            for i, (np, count) in enumerate(rows)
+        ]
     def most_alerts_group(
         self, alert_type: Optional[str] = None
     ) -> dict:

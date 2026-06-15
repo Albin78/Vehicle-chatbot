@@ -38,31 +38,23 @@ ACTION_MAPPINGS = {
 # AGGREGATION
 # =========================================================
 
+import re
+
 def extract_aggregation(query: str):
 
     q = query.lower()
 
-    if any(word in q for word in [
-        "average",
-        "avg",
-        "mean"
-    ]):
+    if any(word in q for word in ["average", "mean"]) or re.search(r'\bavg\b', q):
         return "average"
 
-    if any(word in q for word in [
-        "maximum",
-        "highest",
-        "max",
-        "peak"
-    ]):
+    if any(word in q for word in ["maximum", "highest", "peak"]) or re.search(r'\bmax\b', q):
         return "maximum"
 
-    if any(word in q for word in [
-        "minimum",
-        "lowest",
-        "min"
-    ]):
+    if any(word in q for word in ["minimum", "lowest"]) or re.search(r'\bmin\b', q):
         return "minimum"
+
+    if "total" in q or re.search(r'\bsum\b', q):
+        return "total"
 
     return None
 
@@ -140,8 +132,6 @@ ALERT_TYPE_SYNONYMS = {
     "overspeed": "overSpeed",
     "over speed": "overSpeed",
     "speed alert": "overSpeed",
-    "idling": "idling",
-    "idle": "idling",
     "overstay": "overStay",
     "over stay": "overStay",
     "battery disconnection": "batteryDisconnection",
@@ -303,7 +293,7 @@ def detect_source(
             "which driver", "which vehicle", "which vehicles", "who drove", "which truck", "which trucks", "which car", "which cars", "which bus", "which buses",
             "all vehicles", "entire fleet", "fleet", "company", "which of our vehicles", "any vehicles", "are there any vehicles", "what vehicles", "what trucks", "what cars",
             "what drivers", "any drivers", "list drivers", "all drivers",
-            "vehicles with", "vehicles having", "vehicles that", "list vehicles",
+            "vehicles with", "vehicles having", "vehicles that", "list vehicles", "stationary vehicles", "vehicles in", "vehicles from", "list of vehicles", "show me vehicles",
             "drivers with", "drivers having", "drivers that", "drivers who", "drivers which",
             "most distance", "least distance", "highest distance", "lowest distance",
             "most idle", "least idle", "most idle time", "least idle time",
@@ -316,6 +306,7 @@ def detect_source(
             "most overspeed", "most alerts", "most violations", "least alerts", "least violations",
             "most alert", "most violation", "frequent alert", "most overstay",
             "rank", "top vehicle", "top driver", "top drivers", "top ", "most speed", "least speed",
+            "list alerts", "all alerts", "list all alerts", "count alerts", "how many alerts", "total alerts", "show alerts", "what alerts", "any alerts",
             "which group", "groups with", "what group", "what groups", "most alert group", "list groups", "all groups",
             "fleet status", "fleet overview", "overview", "overall status",
             "status of vehicle", "status of all vehicles",
@@ -384,7 +375,11 @@ def extract_alert_focus(query: str):
         return "overspeed"
 
     if "idling" in q or "idle" in q:
-        return "idling"
+        if "idle time" in q or "idling time" in q:
+            if "alert" in q or "violation" in q:
+                return "idling"
+        else:
+            return "idling"
 
     if (
         "afterhours" in q
@@ -544,7 +539,7 @@ def _extract_fleet_fields(query: str) -> dict:
         filt = "moving"
     elif ("idle" in q or "idling" in q) and metric != "idle_time":
         filt = "idle"
-    elif "stopped" in q and metric != "stop_time":
+    elif ("stopped" in q or "stationary" in q) and metric != "stop_time":
         filt = "stopped"
     elif "out of network" in q or "out network" in q:
         filt = "out_network"
@@ -629,7 +624,12 @@ def detect_summary_requested(query: str):
         "latest status",
         "complete status",
         "full status",
-        "overall status"
+        "overall status",
+        "detailed status",
+        "realtime status",
+        "real time status",
+        "detailed realtime status",
+        "detailed real time status"
     ]
 
     if not any(p in q for p in phrases):
