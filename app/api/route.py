@@ -10,6 +10,8 @@ from app.validators.result_validator import validate_result, validate_intent, va
 from app.agent.response_generator import generate_response
 from app.utils.logger import logger
 from app.tools.vehicle_resolver import resolve_vehicle
+from app.memory.session_manager import session_manager
+from app.agent.query_rewriter import rewrite_query
 
 router = APIRouter()
 
@@ -31,7 +33,11 @@ def query_system(data: QueryRequest):
     logger.info(f"Passed query: {data.query}")
 
     try:
-        intent = extract_intent(data.query)
+        # Retrieve history and rewrite query
+        history = session_manager.get_history(data.session_id)
+        rewritten_query = rewrite_query(data.query, history) if data.session_id else data.query
+
+        intent = extract_intent(rewritten_query)
 
         if isinstance(intent, dict) and intent.get("error"):
             return {
@@ -66,8 +72,15 @@ def query_system(data: QueryRequest):
                 return True
             return False
 
-        if not intent.vehicle_id and intent.source != "fleet_analytics":
-            if is_general_query(data.query):
+        # Implicit Intent Inheritance
+        if not intent.vehicle_id and getattr(intent, "source", None) != "fleet_analytics" and data.session_id:
+            last_intent = session_manager.get_last_intent(data.session_id)
+            if last_intent.get("last_vehicle_id"):
+                intent.vehicle_id = last_intent["last_vehicle_id"]
+                logger.info(f"Inherited vehicle_id from session: {intent.vehicle_id}")
+
+        if not intent.vehicle_id and getattr(intent, "source", None) != "fleet_analytics":
+            if is_general_query(rewritten_query):
                 return {
                     "response": "I am a VMS chatbot. I am only able to answer vehicle-related queries. I can help you check vehicle status, track telemetry metrics, summarize reports, or view alerts for your fleet."
                 }
@@ -113,6 +126,10 @@ def query_system(data: QueryRequest):
         response = generate_response(validated_result, intent)
 
         logger.info(f"Response: {response}")
+
+        # Save interaction to session memory
+        if data.session_id:
+            session_manager.add_interaction(data.session_id, rewritten_query, response, intent, validated_result)
 
         end_time = time()
         logger.info(f"Total time taken: {end_time - start_time} seconds")

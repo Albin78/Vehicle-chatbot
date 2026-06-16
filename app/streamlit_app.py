@@ -15,6 +15,11 @@ st.title("VMS Chatbot")
 # -------------------------
 # Session history
 # -------------------------
+import uuid
+
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+
 if "history" not in st.session_state:
     st.session_state.history = []
 
@@ -61,7 +66,8 @@ if submit:
                 response = requests.post(
                     API_URL,
                     json={
-                        "query": query
+                        "query": query,
+                        "session_id": st.session_state.session_id
                     },
                     headers={"Content-Type": "application/json"},
                     timeout=30,
