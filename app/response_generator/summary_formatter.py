@@ -298,6 +298,7 @@ def format_summary_metric(result):
 
     metrics_data = result.get("metrics", {})
     metric_aggs = result.get("metric_aggregations", {})
+    metric_dates = result.get("metric_dates", {})
     global_agg = result.get("aggregation") or "requested"
     formatted_range = format_time_generate(result.get("time_range"))
     vehicle_id = result.get("vehicle")
@@ -314,7 +315,14 @@ def format_summary_metric(result):
         if metric in ["distance", "distance_travelled", "idle_time", "moving_time", "stop_time"] and specific_agg != "average":
             agg_word = "total"
             
-        parts.append(f"{agg_word} {metric} was {value} {unit}".strip())
+        metric_str = f"{agg_word} {metric} was {value} {unit}".strip()
+        
+        # Include date if available
+        if metric in metric_dates and metric_dates[metric]:
+            formatted_date = safe_format_date(metric_dates[metric])
+            metric_str += f" on {formatted_date}"
+            
+        parts.append(metric_str)
 
     metrics_str = ", and ".join(parts)
 

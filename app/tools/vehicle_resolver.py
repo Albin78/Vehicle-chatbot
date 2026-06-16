@@ -12,7 +12,6 @@ def resolve_vehicle(vehicle_id: str, company_id: int):
         logger.error("[RESOLVER] Cache missing or invalid")
         return None
     
-    logger.info(f"Cache builded: {cache}")
     key = normalize_vehicle_id(vehicle_id)
 
     vehicle = cache["index"].get(key)
@@ -20,7 +19,7 @@ def resolve_vehicle(vehicle_id: str, company_id: int):
     if not vehicle:
         logger.warning(f"[RESOLVER] Vehicle not found for the id. Check the vehicle id or try other vehicle id.")
         return None
-    
+
     logger.info(f"Vehicle cache: {vehicle}")
 
     return {

@@ -11,20 +11,34 @@ def rewrite_query(current_query: str, history: List[Dict[str, str]]) -> str:
     for turn in history:
         history_text += f"User: {turn['query']}\nBot: {turn['response']}\n"
         
-    prompt = f"""You are a helpful query rewriter for a vehicle management system.
-Rewrite the user's current input into a fully standalone query using context from the conversation history. Do not answer the query, only rewrite it. If it is already standalone, return it as is.
-CRITICAL INSTRUCTION: If the Bot's response in the history mentions a specific vehicle identifier (e.g., 53380 533, 1833 RXB, 6667 DKB) and the user's follow-up query is related to it, you MUST explicitly include this exact vehicle identifier in your rewritten query.
+    prompt = f"""[INST] You are a specialized query rewriting component. You do NOT converse. You ONLY output the exact rewritten query text.
+If the history mentions a specific vehicle identifier (e.g., 53380 533, 1833 RXB, 6667 DKB, etc.), explicitly include this exact vehicle identifier in your rewritten query.
+CRITICAL REFERENCE RULE: If the User's query contains pronouns ("it", "he", "they") or ordinal references ("the first one", "the second driver", "the last vehicle"), you MUST substitute these references with BOTH the exact Driver Name AND their exact Vehicle Identifier from the history (e.g., "Vehicle 6258 NGB driven by Jebin"). NEVER refer to a driver without also including their Vehicle Identifier.
+CRITICAL DATE RULE: If the User's query asks for "current", "latest", "now", or present-tense information (e.g., "what is its current speed?"), you MUST NOT include any historical dates (like "June 15") from the history in your rewritten query.
 
-Example:
+Example 1:
+History:
 Bot: "Driver Vipin Kunookkara is assigned to vehicle 53380 533 and achieved a max speed of 121.0 km/h."
 User: "On which date did this happen?"
-Rewritten Output: "On which date did vehicle 53380 533 achieve the maximum speed of 121.0 km/h?"
+Rewritten query: On which date did vehicle 53380 533 achieve the maximum speed of 121.0 km/h?
 
-Conversation History:
+Example 2:
+History:
+Bot: "Vehicle 1833 RXB travelled 150 km."
+User: "What was its max speed?"
+Rewritten query: What was the maximum speed of vehicle 1833 RXB?
+
+Example 3:
+History:
+Bot: "Vehicle 6258 NGB, driven by Jebin, ranks 1st. Vehicle 6667 DKB, driven by Rubel, ranks 2nd."
+User: "which vehicle did the first driver drive?"
+Rewritten query: Which vehicle did the first driver (Jebin driving Vehicle 6258 NGB) drive?
+
+Now rewrite the following User query, incorporating the relevant context from the History. Do NOT echo the history. Output ONLY the rewritten query.
+History:
 {history_text}
-Current User Input: {current_query}
-
-Rewritten Output:"""
+User query to rewrite: {current_query}
+[/INST]"""
 
     try:
         client = OllamaClient()

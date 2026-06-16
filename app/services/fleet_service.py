@@ -59,7 +59,13 @@ def handle_fleet_service(intent, plan, company_id: int) -> dict:
     query_text = (getattr(intent, "query", "") or "").lower()
     is_current_query = any(w in query_text for w in ["current", "currently", "now", "latest"])
     valid_state_filters = {"", "on", "off", "open", "closed", "fastened", "unfastened", "enabled", "disabled"}
-    is_live_metrics_only = bool(metrics_list and not qtype and filt in valid_state_filters and metric in ("", "status"))
+    
+    # We only need live data if asking for specific live metrics OR if filtering by a live status (moving, idle, etc.)
+    is_live_metrics_only = False
+    if metrics_list and not qtype and filt in valid_state_filters and metric in ("", "status"):
+        is_live_metrics_only = True
+    elif filt in {"moving", "idle", "stopped", "out_network", "disconnected"} and qtype != "fleet_overview":
+        is_live_metrics_only = True
 
     # --------------------------------------------------
     # 2. RESOLVE DATE RANGE
@@ -86,22 +92,7 @@ def handle_fleet_service(intent, plan, company_id: int) -> dict:
     )
 
     # --------------------------------------------------
-    # 2. SINGLE FLEET API CALL
-    # --------------------------------------------------
-    raw = combined_report_fleet(
-        company_id=company_id,
-        from_date=from_date,
-        to_date=to_date
-    )
-
-    if not raw.get("success"):
-        return {
-            "type":    "error",
-            "message": raw.get("error", "Fleet data unavailable")
-        }
-
-    # --------------------------------------------------
-    # 3. BUILD ANALYZER WITH VEHICLE ID MAP
+    # 2.5 BUILD ANALYZER WITH VEHICLE ID MAP & SHORT-CIRCUIT LIVE ONLY
     # --------------------------------------------------
     cache = get_vehicle_cache(company_id)
     vid_to_np = {}
@@ -110,6 +101,27 @@ def handle_fleet_service(intent, plan, company_id: int) -> dict:
         np = vehicle.get("NumberPlate")
         if vid and np:
             vid_to_np[vid] = np
+
+    if is_live_metrics_only:
+        logger.info("[FLEET SERVICE] Short-circuiting combined API call for live-only query.")
+        raw = {
+            "success": True,
+            "lastRecords": {"data": cache.get("data", [])},
+            "alerts": {},
+            "operationSummary": {}
+        }
+    else:
+        raw = combined_report_fleet(
+            company_id=company_id,
+            from_date=from_date,
+            to_date=to_date
+        )
+
+    if not raw.get("success"):
+        return {
+            "type":    "error",
+            "message": raw.get("error", "Fleet data unavailable")
+        }
 
     analyzer = FleetAnalyzer(raw, vid_to_np)
 
@@ -122,7 +134,7 @@ def handle_fleet_service(intent, plan, company_id: int) -> dict:
     result["time_range_altered_to_week"] = time_range_altered_to_week
     result["type"]        = "fleet_analytics"
 
-    logger.info(f"[FLEET SERVICE] Result: {result}")
+    logger.debug(f"[FLEET SERVICE] Result: {result}")
     return result
 
 

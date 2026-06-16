@@ -53,9 +53,9 @@ class FleetAnalyzer:
         self.op_rows: list[dict]       = op.get("dataRows") or []
         self.op_totals: dict           = op.get("summary") or {}
 
-        # Mapping for vehicleName -> numberPlate and vid -> driverName
         self.vn_to_np = {}
         self.vid_to_driver = {}
+        self.np_to_driver = {}
         for r in self.live_records:
             vn = r.get("vehicleName")
             np = r.get("numberPlate")
@@ -66,6 +66,8 @@ class FleetAnalyzer:
             driver = r.get("driverName")
             if vid is not None and driver:
                 self.vid_to_driver[vid] = driver
+            if np and driver:
+                self.np_to_driver[np] = driver
 
         logger.info(
             f"[FLEET ANALYZER] live={len(self.live_records)} "
@@ -239,6 +241,8 @@ class FleetAnalyzer:
             "camera_status": ["CameraStatus"],
             "camera_imei": ["CameraIMEI"],
             "wasl": ["WaslIdentityNumber"],
+            "driver_name": ["driverName"],
+            "driver": ["driverName"]
         }
         
         fields_to_extract = []
@@ -284,7 +288,10 @@ class FleetAnalyzer:
             "driverName": "",
             "groupName": "",
             "total": 0.0,
-            "max": 0.0,
+            "max": -1.0,
+            "min": float('inf'),
+            "max_date": None,
+            "min_date": None,
             "days": 0
         })
 
@@ -300,6 +307,7 @@ class FleetAnalyzer:
             dn  = row.get("driverName") or self.vid_to_driver.get(vid) or ""
             gn  = row.get("groupName") or ""
             raw = row.get(metric)
+            row_date = row.get("Date") or row.get("ReportDate") or row.get("DateString")
 
             try:
                 val = float(raw) if raw is not None else 0.0
@@ -311,8 +319,21 @@ class FleetAnalyzer:
             agg[vn]["driverName"]  = dn or agg[vn]["driverName"]
             agg[vn]["groupName"]   = gn or agg[vn]["groupName"]
             agg[vn]["total"]      += val
-            agg[vn]["max"]         = max(agg[vn]["max"], val)
+            
+            if agg[vn]["max"] < 0 or val > agg[vn]["max"]:
+                agg[vn]["max"] = val
+                agg[vn]["max_date"] = row_date
+
+            if agg[vn]["min"] == float('inf') or val < agg[vn]["min"]:
+                agg[vn]["min"] = val
+                agg[vn]["min_date"] = row_date
+
             agg[vn]["days"]       += 1
+
+        # Fix infinity for vehicles with no rows (though loop prevents that)
+        for vn in agg:
+            if agg[vn]["min"] == float('inf'):
+                agg[vn]["min"] = 0.0
 
         return dict(agg)
 
@@ -347,8 +368,10 @@ class FleetAnalyzer:
 
         if aggregation == "maximum":
             top = max(rows, key=lambda r: r[sort_key])
+            date_key = "max_date"
         else:
             top = min(rows, key=lambda r: r[sort_key])
+            date_key = "min_date"
 
         return {
             "vehicleName": top["vehicleName"],
@@ -356,6 +379,7 @@ class FleetAnalyzer:
             "driverName":  top["driverName"],
             "groupName":   top["groupName"],
             "value":       top[sort_key],
+            "date":        top.get(date_key),
             "metric":      metric,
             "days_tracked": top["days"],
         }
@@ -564,7 +588,7 @@ class FleetAnalyzer:
             {
                 "rank":        i + 1,
                 "numberPlate": np,
-                "driverName":  drivers.get(np, "Unknown"),
+                "driverName":  drivers.get(np) or self.np_to_driver.get(np, "Unknown"),
                 "groupName":   groups.get(np, "Unknown"),
                 "value":       count,
                 "alertDistribution": dict(vehicle_distributions[np])

@@ -282,40 +282,41 @@ def detect_source(
 
     # --------------------------------------------------
     # FLEET ANALYTICS
-    # Triggered when NO vehicle_id is present AND the
-    # query contains comparative / fleet-wide keywords.
-    # Must be checked BEFORE alert / summary detection
-    # so that "which driver had most overspeed alerts"
-    # is routed to fleet_analytics, not plain "alert".
+    # Triggered when the query contains comparative /
+    # fleet-wide keywords. We check this first because
+    # the LLM sometimes extracts group names like "others"
+    # as the vehicle_id by mistake.
     # --------------------------------------------------
+    fleet_keywords = [
+        "which driver", "which vehicle", "which vehicles", "who drove", "which truck", "which trucks", "which car", "which cars", "which bus", "which buses",
+        "all vehicles", "entire fleet", "fleet", "company", "which of our vehicles", "any vehicles", "are there any vehicles", "what vehicles", "what trucks", "what cars",
+        "what drivers", "any drivers", "list drivers", "all drivers",
+        "vehicles with", "vehicles having", "vehicles that", "list vehicles", "stationary vehicles", "vehicles in", "vehicles from", "list of vehicles", "show me vehicles",
+        "drivers with", "drivers having", "drivers that", "drivers who", "drivers which",
+        "most distance", "least distance", "highest distance", "lowest distance",
+        "most idle", "least idle", "most idle time", "least idle time",
+        "most moving", "least moving", "most moving time", "least moving time",
+        "most stop time", "least stop time", "most engine hours", "least engine hours",
+        "highest speed", "lowest speed", "maximum speed", "minimum speed",
+        "who was speeding", "who is speeding",
+        "fastest driver", "fastest drivers", "fastest vehicle", "fastest vehicles", "fastest truck", "fastest car", "fastest bus",
+        "slowest driver", "slowest drivers", "slowest vehicle", "slowest vehicles", "slowest truck", "slowest car", "slowest bus",
+        "most overspeed", "most alerts", "most violations", "least alerts", "least violations",
+        "most alert", "most violation", "frequent alert", "most overstay",
+        "rank", "top vehicle", "top driver", "top drivers", "top ", "most speed", "least speed",
+        "list alerts", "all alerts", "list all alerts", "count alerts", "how many alerts", "total alerts", "show alerts", "what alerts", "any alerts",
+        "which group", "groups with", "what group", "what groups", "most alert group", "list groups", "all groups",
+        "fleet status", "fleet overview", "overview", "overall status",
+        "status of vehicle", "status of all vehicles",
+        "how many vehicles", "list all vehicles",
+        "vehicles moving", "vehicles stopped", "vehicles idle", "vehicles idling",
+        "vehicles are moving", "vehicles are stopped", "vehicles are idle", "vehicles are idling",
+        "drivers moving", "drivers stopped", "drivers idle", "drivers idling",
+        "drivers are moving", "drivers are stopped", "drivers are idle", "drivers are idling",
+    ]
+    
+    # If a specific vehicle ID was already resolved, this is a single-vehicle query, not a fleet query.
     if not vehicle_id:
-        fleet_keywords = [
-            "which driver", "which vehicle", "which vehicles", "who drove", "which truck", "which trucks", "which car", "which cars", "which bus", "which buses",
-            "all vehicles", "entire fleet", "fleet", "company", "which of our vehicles", "any vehicles", "are there any vehicles", "what vehicles", "what trucks", "what cars",
-            "what drivers", "any drivers", "list drivers", "all drivers",
-            "vehicles with", "vehicles having", "vehicles that", "list vehicles", "stationary vehicles", "vehicles in", "vehicles from", "list of vehicles", "show me vehicles",
-            "drivers with", "drivers having", "drivers that", "drivers who", "drivers which",
-            "most distance", "least distance", "highest distance", "lowest distance",
-            "most idle", "least idle", "most idle time", "least idle time",
-            "most moving", "least moving", "most moving time", "least moving time",
-            "most stop time", "least stop time", "most engine hours", "least engine hours",
-            "highest speed", "lowest speed", "maximum speed", "minimum speed",
-            "who was speeding", "who is speeding",
-            "fastest driver", "fastest drivers", "fastest vehicle", "fastest vehicles", "fastest truck", "fastest car", "fastest bus",
-            "slowest driver", "slowest drivers", "slowest vehicle", "slowest vehicles", "slowest truck", "slowest car", "slowest bus",
-            "most overspeed", "most alerts", "most violations", "least alerts", "least violations",
-            "most alert", "most violation", "frequent alert", "most overstay",
-            "rank", "top vehicle", "top driver", "top drivers", "top ", "most speed", "least speed",
-            "list alerts", "all alerts", "list all alerts", "count alerts", "how many alerts", "total alerts", "show alerts", "what alerts", "any alerts",
-            "which group", "groups with", "what group", "what groups", "most alert group", "list groups", "all groups",
-            "fleet status", "fleet overview", "overview", "overall status",
-            "status of vehicle", "status of all vehicles",
-            "how many vehicles", "list all vehicles",
-            "vehicles moving", "vehicles stopped", "vehicles idle", "vehicles idling",
-            "vehicles are moving", "vehicles are stopped", "vehicles are idle", "vehicles are idling",
-            "drivers moving", "drivers stopped", "drivers idle", "drivers idling",
-            "drivers are moving", "drivers are stopped", "drivers are idle", "drivers are idling",
-        ]
         if any(kw in q for kw in fleet_keywords):
             return "fleet_analytics"
             
@@ -487,10 +488,14 @@ def _extract_fleet_fields(query: str) -> dict:
     q = re.sub(r'[?.,!]', '', query.lower())
 
     # ---- SUBJECT: driver vs vehicle vs group ------------------------
-    if any(w in q for w in ["group", "which group", "groups"]):
-        subject = "group"
-    elif any(w in q for w in ["driver", "who drove", "which driver", "who was speeding", "who is speeding"]):
+    if any(w in q for w in ["which driver", "what driver", "who drove", "who was speeding", "who is speeding", "top driver"]):
         subject = "driver"
+    elif any(w in q for w in ["which group", "what group", "top group", "most alert group"]):
+        subject = "group"
+    elif "driver" in q and not any(w in q for w in ["vehicle", "group", "truck", "car"]):
+        subject = "driver"
+    elif "group" in q and not any(w in q for w in ["vehicle", "driver", "truck", "car"]):
+        subject = "group"
     else:
         subject = "vehicle"
 

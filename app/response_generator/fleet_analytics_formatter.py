@@ -151,17 +151,19 @@ def format_fleet_analytics(result: dict) -> str:
                     f"with a total of {val} {tr_str}.{dist_str}"
                 )
         else:
+            date_val = result.get('date')
+            date_str = f" on {date_val}" if date_val else ""
             if subject == "driver":
                 driver_display = "driver details not currently available" if is_driver_unavailable else f"'{driver_formatted}'"
                 return (
                     f"Driver {driver_display} (in vehicle {plate}{group_str}) had {qualifier} {metric} "
-                    f"with a value of {val} {tr_str}."
+                    f"with a value of {val} {tr_str}{date_str}."
                 )
             else:
                 driver_str = f" (driver details not currently available)" if is_driver_unavailable else f" driven by '{driver_formatted}'"
                 return (
                     f"Vehicle {plate}{driver_str}{group_str} had {qualifier} {metric} "
-                    f"with a value of {val} {tr_str}."
+                    f"with a value of {val} {tr_str}{date_str}."
                 )
 
     if q_type == "fleet_status_list":
@@ -178,15 +180,17 @@ def format_fleet_analytics(result: dict) -> str:
             dn = _format_driver(v.get('driverName'))
             
             if subject == "driver":
-                return f"{dn} (Vehicle: {np})" if dn else f"Unknown Driver (Vehicle: {np})"
+                return f"- Driver {dn} (Vehicle: {np})" if dn else f"- Unknown Driver (Vehicle: {np})"
+            elif subject == "group":
+                return f"- Group {np}"
             else:
-                return f"{np} (Driver: {dn})" if dn else np
+                return f"- Vehicle {np} (Driver: {dn})" if dn else f"- Vehicle {np}"
             
-        vehicle_list_str = ", ".join(format_v(v) for v in vehicles[:20])
+        vehicle_list_str = "\n".join(format_v(v) for v in vehicles[:20])
         if count > 20:
-            vehicle_list_str += f" and {count - 20} more"
+            vehicle_list_str += f"\n- ... and {count - 20} more"
             
-        return f"Currently, there are {count} {subject}s with the status '{status}': {vehicle_list_str}."
+        return f"Currently, there are {count} {subject}s with the status '{status}':\n{vehicle_list_str}"
 
     if q_type == "fleet_metrics_list":
         metrics_req = result.get("metrics_requested", [])
@@ -206,6 +210,7 @@ def format_fleet_analytics(result: dict) -> str:
         import re
         for v in vehicles:
             plate = v.get("numberPlate") or v.get("vehicleName") or "Unknown"
+            group = v.get("groupName", "Unknown")
             include_vehicle = True
             
             if "remote_immobilization" in metrics_req:
@@ -325,7 +330,9 @@ def format_fleet_analytics(result: dict) -> str:
                 parts.insert(0, f"Seat Belt: {v.get('Seatbelt_formatted')}")
                 
             metrics_str = " | ".join(parts)
-            lines.append(f"- Vehicle {plate}: {metrics_str}")
+            driver = v.get("driverName")
+            driver_str = f" (Driver: {driver})" if driver and driver not in ("null", "NA", "None", "", "Unknown") else ""
+            lines.append(f"- Vehicle {plate}{driver_str} (Group: {group}): {metrics_str}")
             
         metrics_name = ", ".join(m.replace("_", " ") for m in metrics_req).title()
         filter_str = f" that are currently {filt}" if filt else ""

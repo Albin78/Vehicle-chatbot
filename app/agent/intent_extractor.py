@@ -154,7 +154,7 @@ ONLY if query asks:
 - latest status
 
 9. vehicle_id
-MUST extract the vehicle identifier if present in the text (e.g. '1832 RXB', '2376 ABC', '73 RRR'). Do NOT extract generic words like 'truck' or 'car' as vehicle_id.
+MUST extract the vehicle identifier if present in the text. Do NOT extract generic words like 'truck' or 'car' as vehicle_id. Do NOT invent or guess a vehicle_id if it is not explicitly mentioned.
 
 =========================================================
 STRICT OUTPUT FORMAT

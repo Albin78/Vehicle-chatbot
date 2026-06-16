@@ -3,6 +3,9 @@ from typing_extensions import Optional, Any
 from app.utils.logger import logger
 from app.config import settings
 from datetime import datetime
+from cachetools import cached, TTLCache
+
+api_cache = TTLCache(maxsize=100, ttl=300) # 5 minutes TTL
 
 
 BASE_URL = settings.VEHICLE_API_URL
@@ -84,12 +87,10 @@ def get_vehicle_details(company_id: Optional[int]=16):
 
 
 
-def combined_report(
-    vehicle_id: int | None,
-    company_id: int | None,
-    from_date: datetime | None,
-    to_date: datetime | None
-):
+import copy
+
+@cached(cache=api_cache)
+def _cached_combined_report(vehicle_id, company_id, from_date, to_date):
     try:
         if not vehicle_id:
             return {"response": "ID is required"}
@@ -128,9 +129,6 @@ def combined_report(
 
         data = response.json()
 
-        # if not data.get("dataRows"):
-        #     return {"response": "No data available for this vehicle"}
-
         return data
 
     except requests.exceptions.Timeout:
@@ -144,6 +142,14 @@ def combined_report(
     except Exception:
         logger.exception("Unexpected Error")
         return {"response": "Some internal error happened"}
+
+def combined_report(
+    vehicle_id: int | None,
+    company_id: int | None,
+    from_date: datetime | None,
+    to_date: datetime | None
+):
+    return copy.deepcopy(_cached_combined_report(vehicle_id, company_id, from_date, to_date))
     
 
 
@@ -151,6 +157,7 @@ def combined_report(
 # ALERT ENABLE STATUS API
 # =========================================================
 
+@cached(cache=api_cache)
 def get_alert_enable_status(
     company_id: int,
     vehicle_id: int | None = None,

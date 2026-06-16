@@ -3,6 +3,9 @@ import requests
 from app.utils.logger import logger
 from app.config import settings
 from datetime import datetime, timezone, timedelta
+from cachetools import cached, TTLCache
+
+api_cache = TTLCache(maxsize=50, ttl=300) # 5 minutes TTL
 
 
 BASE_URL    = settings.VEHICLE_API_URL
@@ -14,33 +17,10 @@ COMBINED_URL = settings.COMBINED_VEHICLE
 # FLEET-WIDE COMBINED REPORT  (no vid param)
 # =========================================================
 
-def combined_report_fleet(
-    company_id: int,
-    from_date: str,
-    to_date: str
-) -> dict:
-    """
-    Fetches the combined report for ALL vehicles in the fleet.
+import copy
 
-    This is identical to combined_report() in external_api_tool.py
-    but intentionally omits the 'vid' parameter so the API returns
-    lastRecords, alerts, and operationSummary for every vehicle
-    belonging to the company in a single call.
-
-    Args:
-        company_id: Company identifier.
-        from_date:  Start date string  "YYYY-MM-DD".
-        to_date:    End date string    "YYYY-MM-DD".
-
-    Returns:
-        Raw API dict with keys:
-          - success
-          - lastRecords.data[]          (per-vehicle live snapshot)
-          - lastRecords.overAllCount    (pre-aggregated fleet counts)
-          - alerts.results[]            (alert events in date range)
-          - operationSummary.dataRows[] (per-vehicle-per-day rows)
-          - operationSummary.summary    (fleet-level totals)
-    """
+@cached(cache=api_cache)
+def _cached_combined_report_fleet(company_id, from_date, to_date):
     try:
         headers = {
             "Authorization": f"Bearer {AUTH_TOKEN}",
@@ -86,6 +66,13 @@ def combined_report_fleet(
     except Exception:
         logger.exception("[FLEET API] Unexpected Error")
         return {"success": False, "error": "Internal fleet API error"}
+
+def combined_report_fleet(
+    company_id: int,
+    from_date: str,
+    to_date: str
+) -> dict:
+    return copy.deepcopy(_cached_combined_report_fleet(company_id, from_date, to_date))
 
 
 # =========================================================

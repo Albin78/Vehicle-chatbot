@@ -101,6 +101,14 @@ def query_system(data: QueryRequest):
         if intent.vehicle_id and intent.source != "fleet_analytics":
             vehicle_context = resolve_vehicle(intent.vehicle_id, company_id)
 
+            if not vehicle_context and data.session_id:
+                # LLM might have hallucinated. Try falling back to session history.
+                last_intent = session_manager.get_last_intent(data.session_id)
+                if last_intent.get("last_vehicle_id"):
+                    logger.info(f"Vehicle {intent.vehicle_id} not found, falling back to session vehicle: {last_intent['last_vehicle_id']}")
+                    intent.vehicle_id = last_intent["last_vehicle_id"]
+                    vehicle_context = resolve_vehicle(intent.vehicle_id, company_id)
+
             if not vehicle_context:
                 return {"response": f"Vehicle not found for vehicle id {intent.vehicle_id}. Check the vehicle id or try other vehicle id"}
 
@@ -115,7 +123,7 @@ def query_system(data: QueryRequest):
         # -----------------------------
         result = route_tool(intent, plan, company_id)
 
-        logger.info(f"Final result before validation: {result}, type: {type(result)}")
+        logger.debug(f"Final result before validation: {result}, type: {type(result)}")
 
         validation = validate_result(result)
         if validation["type"] == "error":
@@ -132,6 +140,7 @@ def query_system(data: QueryRequest):
             session_manager.add_interaction(data.session_id, rewritten_query, response, intent, validated_result)
 
         end_time = time()
+        logger.info(f"Response after the LLM processing: {response}")
         logger.info(f"Total time taken: {end_time - start_time} seconds")
 
         return {"response": response}

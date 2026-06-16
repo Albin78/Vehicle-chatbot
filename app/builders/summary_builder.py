@@ -95,20 +95,26 @@ def compute_metric(rows, metric, aggregation, query_string=""):
         if specific_agg not in ["maximum", "minimum"]:
             specific_agg = "total"
     elif specific_agg == "maximum":
-        result = max(values)
+        max_idx = values.index(max(values))
+        result = values[max_idx]
+        result_date = rows[max_idx].get("Date") or rows[max_idx].get("ReportDate") or rows[max_idx].get("DateString")
     elif specific_agg == "minimum":
-        result = min(values)
+        min_idx = values.index(min(values))
+        result = values[min_idx]
+        result_date = rows[min_idx].get("Date") or rows[min_idx].get("ReportDate") or rows[min_idx].get("DateString")
     elif specific_agg == "average":
         result = sum(values) / len(values)
+        result_date = None
     else:
         result = sum(values) if specific_agg == "total" else values[-1]
+        result_date = None
         
     if is_time_metric:
         val = format_seconds(result)
     else:
         val = round(result, 2)
         
-    return {"value": val, "aggregation": specific_agg}
+    return {"value": val, "aggregation": specific_agg, "date": result_date}
 
 
 def build_daily_reports(rows):
@@ -231,6 +237,7 @@ def build_summary_response(intent, api_result):
 
         metrics_data = {}
         metric_aggregations = {}
+        metric_dates = {}
         query_str = getattr(intent, "query", "") or ""
         
         for m in intent.metrics:
@@ -239,6 +246,8 @@ def build_summary_response(intent, api_result):
                 if res is not None:
                     metrics_data[m] = res["value"]
                     metric_aggregations[m] = res["aggregation"]
+                    if res.get("date"):
+                        metric_dates[m] = res["date"]
 
         # Only return a metric summary if we actually computed at least one metric
         if metrics_data and not intent.summary_requested:
@@ -251,6 +260,7 @@ def build_summary_response(intent, api_result):
 
                 "metrics": metrics_data,
                 "metric_aggregations": metric_aggregations,
+                "metric_dates": metric_dates,
 
                 "aggregation":
                     intent.aggregation,

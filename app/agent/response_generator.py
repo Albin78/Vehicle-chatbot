@@ -8,8 +8,8 @@ llm = OllamaClient()
 
 def generate_response(result, intent):
 
-    logger.info(f"Result passed into the response generation: {result}")
-    logger.info(f"ResponseGenerator intent: {intent}")
+    logger.debug(f"Result passed into the response generation: {result}")
+    logger.debug(f"ResponseGenerator intent: {intent}")
 
     if not result:
         return "No data found."
@@ -98,7 +98,7 @@ def generate_response(result, intent):
             "CRITICAL CONTRACT:\n"
             "1. EXACT FACTS ONLY: You MUST ONLY use the exact facts, vehicles, numbers, and data points provided in the INPUT. Do NOT omit important context (like the specific status being queried). NEVER fabricate, invent, or add fake vehicles (e.g., '12345 XYZ'), fake drivers (e.g., 'Smith', 'Johnson'), or fake dates.\n"
             "2. NO FILLER: Do not add introductory headers (e.g., 'Here is the data:'), extra commentary, conversational filler, or 'Note:' sections.\n"
-            "3. PRESERVE LISTS: If the INPUT contains a list of vehicles (e.g., lines starting with '- Vehicle'), you MUST preserve them as a clean bulleted list. Do not compress them into a paragraph.\n"
+            "3. PRESERVE LISTS: If the INPUT contains a list of vehicles, preserve them as a clean bulleted list. IMPORTANT: If the user's query asks to filter by a specific group, status, or condition (e.g., 'in the Others group', 'without a camera'), you MUST filter the INPUT list to ONLY include vehicles that match the user's criteria.\n"
             "4. NO QUOTES: Do not add quotation marks around vehicle names, group names, driver names, metrics, or statuses.\n"
             "5. DRIVERS & ENTITIES: Treat driver names and group names as single immutable entities. If driver details are explicitly present in the INPUT and the driver is 'null', 'NA', 'None', 'Unknown', or 'Unassigned', output 'driver details are not currently available'. If drivers are NOT mentioned in the INPUT, DO NOT mention drivers at all in your OUTPUT.\n"
             "6. VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name' (e.g. do not change 'Vehicle 1342 ABC' into 'Vehicle ID: 1342, Name: ABC'). Treat the entire identifier as a single immutable string.\n"
@@ -188,7 +188,7 @@ def generate_response(result, intent):
 
     response = llm.generate(prompt).strip()
 
-    if result.get("type") in ["summary", "summary_metric"]:
+    if result.get("type") == "summary":
         query_str = getattr(intent, "query", "") or ""
         query_lower = query_str.lower()
 

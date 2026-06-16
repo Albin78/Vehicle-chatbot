@@ -145,11 +145,6 @@ def vehicle_key_builder(vehicle):
 
     normalized = normalize_vehicle_id(plate)
 
-    logger.info(
-        f"Cache indexed vehicle: "
-        f"{plate} -> {normalized}"
-    )
-
     return normalized
 
 
