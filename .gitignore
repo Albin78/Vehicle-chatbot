@@ -99,3 +99,5 @@ scratch_llm.py
 test_queries.py
 test.py
 comprehensive_test_cases.txt
+test_production.py
+test__*.*
