@@ -13,7 +13,8 @@ REALTIME_METRIC_MAP = {
     "fuel_capacity": "fuelCapacity",
     "tanker_fuel_capacity": "TankerfuelCapacity",
     "battery": "batteryLevel",
-    "fuel_level": "fuelLevel"
+    "fuel_level": "fuelLevel",
+    "vehicle_id": "numberPlate"
 }
 
 def detect_alert_analysis(query: str) -> str:

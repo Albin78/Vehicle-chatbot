@@ -43,6 +43,8 @@ REALTIME_METRIC_MAP = {
     "imei": "IMEI",
 
     "vehicle_type": "typeName",
+    
+    "vehicle_id": "numberPlate",
 
     "make": "makeName",
 

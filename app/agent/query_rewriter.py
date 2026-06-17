@@ -2,9 +2,13 @@ from typing import List, Dict
 from app.llm.ollama_client import OllamaClient
 from app.utils.logger import logger
 
-def rewrite_query(current_query: str, history: List[Dict[str, str]]) -> str:
+from typing import Any
+def rewrite_query(current_query: str, history: List[Dict[str, str]], last_intent: Dict[str, Any] = None) -> str:
     if not history:
         return current_query
+    
+    last_intent = last_intent or {}
+    last_vehicle_id = last_intent.get("last_vehicle_id", "None")
     
     # Format history
     history_text = ""
@@ -12,27 +16,44 @@ def rewrite_query(current_query: str, history: List[Dict[str, str]]) -> str:
         history_text += f"User: {turn['query']}\nBot: {turn['response']}\n"
         
     prompt = f"""[INST] You are a specialized query rewriting component. You do NOT converse. You ONLY output the exact rewritten query text.
-If the history mentions a specific vehicle identifier (e.g., 53380 533, 1833 RXB, 6667 DKB, etc.), explicitly include this exact vehicle identifier in your rewritten query.
-CRITICAL REFERENCE RULE: If the User's query contains pronouns ("it", "he", "they") or ordinal references ("the first one", "the second driver", "the last vehicle"), you MUST substitute these references with BOTH the exact Driver Name AND their exact Vehicle Identifier from the history (e.g., "Vehicle 6258 NGB driven by Jebin"). NEVER refer to a driver without also including their Vehicle Identifier.
-CRITICAL DATE RULE: If the User's query asks for "current", "latest", "now", or present-tense information (e.g., "what is its current speed?"), you MUST NOT include any historical dates (like "June 15") from the history in your rewritten query.
+Your ONLY job is to substitute pronouns (e.g., "it", "he", "this vehicle", "the vehicle") and implicit references in the User query with the explicit Vehicle Identifier and/or Driver Name from the History.
+
+CRITICAL RULES:
+1. ALWAYS explicitly include the specific Vehicle Identifier (e.g., "1833 RXB") if it is mentioned in the history. Do NOT omit it for brevity. You MUST substitute phrases like "the vehicle" with the actual vehicle identifier.
+2. DO NOT change or guess metrics. Keep the user's exact phrasing for metrics. However, if the user asks a completely vague follow-up question like "on which day" or "what about the second one", you MUST include the relevant metric from the history to make the query complete.
+3. DO NOT change, add, rephrase, or omit time expressions (like "now", "last week", "june 12", "previous week"). Keep them EXACTLY as the user typed them.
+4. DO NOT change an "alert" query into a "status" query. If the user asks about a "seatbelt alert", keep the words "seatbelt alert".
+5. If the User's query asks for "current", "now", or present-tense information, do NOT inject historical dates from the history.
+6. DO NOT copy metrics or alert types from the examples. ONLY use the metrics and alert types present in the user's actual query.
+7. Preserve the exact core question the user is asking. DO NOT invent conversational connections. If the user asks "what is the vehicle id", rewrite it as "What is the vehicle ID of [Vehicle]?" without changing the meaning.
+8. NEVER inject metrics, alert types, or details from the History into the rewritten query UNLESS the user's query is a completely incomplete sentence fragment (like "on which day?"). For self-contained questions (e.g., "does it currently moving?", "which group does it belong to?"), ONLY replace pronouns with the explicit Vehicle ID or Driver Name.
+9. EXACT SUBSTITUTION: If the User query uses "this vehicle", "the vehicle", or "it", and the Current Vehicle in Context is not 'None', you MUST substitute those exact pronouns with the Current Vehicle ID. DO NOT use descriptive phrases like "the vehicle with the most alerts". Just use the ID!
+
+Current Vehicle in Context: {last_vehicle_id}
 
 Example 1:
 History:
-Bot: "Driver Vipin Kunookkara is assigned to vehicle 53380 533 and achieved a max speed of 121.0 km/h."
-User: "On which date did this happen?"
-Rewritten query: On which date did vehicle 53380 533 achieve the maximum speed of 121.0 km/h?
+Bot: "Vehicle 1833 RXB travelled 150 km."
+User: "what is its average speed on last week?"
+Rewritten query: What is the average speed of vehicle 1833 RXB on last week?
 
 Example 2:
 History:
-Bot: "Vehicle 1833 RXB travelled 150 km."
-User: "What was its max speed?"
-Rewritten query: What was the maximum speed of vehicle 1833 RXB?
+Bot: "Driver Vipin Kunookkara is assigned to vehicle 53380 533."
+User: "Does it have harsh braking alert on june 10"
+Rewritten query: Does vehicle 53380 533 have harsh braking alert on june 10?
 
 Example 3:
 History:
-Bot: "Vehicle 6258 NGB, driven by Jebin, ranks 1st. Vehicle 6667 DKB, driven by Rubel, ranks 2nd."
-User: "which vehicle did the first driver drive?"
-Rewritten query: Which vehicle did the first driver (Jebin driving Vehicle 6258 NGB) drive?
+Bot: "Vehicle 6258 NGB, driven by Jebin, ranks 1st."
+User: "what is its speed now?"
+Rewritten query: What is the speed of vehicle 6258 NGB now?
+
+Example 4:
+History:
+Bot: "Vehicle 1833 RXB achieved a maximum speed of 142 km/h on June 14."
+User: "who drove the vehicle?"
+Rewritten query: Who drove vehicle 1833 RXB?
 
 Now rewrite the following User query, incorporating the relevant context from the History. Do NOT echo the history. Output ONLY the rewritten query.
 History:

@@ -95,7 +95,8 @@ VALID_METRICS = {
 
     "idle_time",
     "moving_time",
-    "stop_time"
+    "stop_time",
+    "vehicle_id"
 }
 
 
@@ -123,6 +124,11 @@ METRIC_SYNONYMS = {
     "is it moving": "speed",
     "vehicle moving": "speed",
     "movement status": "speed",
+    "stopped": "speed",
+    "is stopped": "speed",
+    "currently stopped": "speed",
+    "is it stopped": "speed",
+    "vehicle stopped": "speed",
 
     "fuel": "fuel_level",
     "fuel level": "fuel_level",
@@ -169,11 +175,19 @@ METRIC_SYNONYMS = {
 
     "driver": "driver_name",
     "driver name": "driver_name",
+    "drove": "driver_name",
+    "drive": "driver_name",
+    "driving": "driver_name",
 
     "group": "group_name",
     "group name": "group_name",
 
     "vehicle type": "vehicle_type",
+    
+    "vehicle id": "vehicle_id",
+    "number plate": "vehicle_id",
+    "plate number": "vehicle_id",
+    "vehicle number": "vehicle_id",
 
     "weight": "weight",
     "load": "weight",
@@ -556,18 +570,16 @@ def extract_metrics(query: str) -> list[str]:
 
     # phrase priority
     for phrase, metric in sorted_synonyms:
-
-        if phrase in q:
+        pattern = r"\b" + re.escape(phrase) + r"\b"
+        if re.search(pattern, q):
             found.add(metric)
             # Mask the matched phrase in q to prevent sub-phrases from matching
-            q = q.replace(phrase, " " * len(phrase))
+            q = re.sub(pattern, " " * len(phrase), q)
 
     # direct metrics
     for metric in VALID_METRICS:
-
         tokens = metric.split("_")
-
-        if all(token in q for token in tokens):
+        if all(re.search(r"\b" + re.escape(token) + r"\b", q) for token in tokens):
             found.add(metric)
 
     return list(found)

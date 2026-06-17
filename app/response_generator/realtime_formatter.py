@@ -94,6 +94,10 @@ FIELD_FORMATTERS = {
     # VEHICLE INFO
     # -----------------------------------------------------
 
+    "vehicle_id":
+        lambda v:
+            f"Vehicle ID is {v}",
+
     "vehicle_type":
         lambda v:
             f"Vehicle type is {v}",

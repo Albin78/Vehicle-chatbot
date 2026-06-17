@@ -92,6 +92,7 @@ idle_time
 distance
 fuel_consumed
 wasl_identity_number
+vehicle_id
 
 =========================================================
 RULES
@@ -205,6 +206,10 @@ JSON only
 
     if parsed_time_range:
         clean_data["time_range"] = parsed_time_range
+    else:
+        # Sanitize hallucinated time_range arrays/dicts to prevent Pydantic crashes
+        if "time_range" in clean_data and not isinstance(clean_data["time_range"], (tuple, str, type(None))):
+            clean_data["time_range"] = None
 
     # -----------------------------------------------------
     # POST VALIDATION

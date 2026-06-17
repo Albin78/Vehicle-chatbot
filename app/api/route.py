@@ -35,7 +35,8 @@ def query_system(data: QueryRequest):
     try:
         # Retrieve history and rewrite query
         history = session_manager.get_history(data.session_id)
-        rewritten_query = rewrite_query(data.query, history) if data.session_id else data.query
+        last_intent = session_manager.get_last_intent(data.session_id) if data.session_id else {}
+        rewritten_query = rewrite_query(data.query, history, last_intent) if data.session_id else data.query
 
         intent = extract_intent(rewritten_query)
 
