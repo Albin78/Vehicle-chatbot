@@ -26,21 +26,31 @@ class SessionManager:
         # Store last intent specifics
         if intent:
             # We store it carefully handling cases where intent might be None or a dict (if error)
-            # Assuming intent is a QueryIntent model at this point, but checking with getattr just in case
-            if hasattr(intent, "vehicle_id") and intent.vehicle_id:
-                self.sessions[session_id]["last_intent"]["last_vehicle_id"] = intent.vehicle_id
-            elif isinstance(result, dict):
+            # Prioritize the actual returned API result to preserve proper formatting (e.g. spaces)
+            updated_from_result = False
+            if isinstance(result, dict):
                 if result.get("numberPlate"):
                     self.sessions[session_id]["last_intent"]["last_vehicle_id"] = result["numberPlate"]
+                    updated_from_result = True
+                elif result.get("vehicle") and isinstance(result["vehicle"], str):
+                    self.sessions[session_id]["last_intent"]["last_vehicle_id"] = result["vehicle"]
+                    updated_from_result = True
                 elif "vehicle" in result and isinstance(result["vehicle"], dict) and result["vehicle"].get("numberPlate"):
                     self.sessions[session_id]["last_intent"]["last_vehicle_id"] = result["vehicle"]["numberPlate"]
+                    updated_from_result = True
                 elif result.get("query_type") == "ranked_alerts" and result.get("ranked"):
                     # Fallback to the first vehicle in the ranked list
                     first_item = result["ranked"][0]
                     if first_item.get("numberPlate"):
                         self.sessions[session_id]["last_intent"]["last_vehicle_id"] = first_item["numberPlate"]
+                        updated_from_result = True
             elif isinstance(result, list) and len(result) > 0 and isinstance(result[0], dict) and result[0].get("numberPlate"):
                 self.sessions[session_id]["last_intent"]["last_vehicle_id"] = result[0]["numberPlate"]
+                updated_from_result = True
+                
+            # Fall back to the intent if the result didn't contain a clear vehicle ID
+            if not updated_from_result and hasattr(intent, "vehicle_id") and intent.vehicle_id:
+                self.sessions[session_id]["last_intent"]["last_vehicle_id"] = intent.vehicle_id
             
             if hasattr(intent, "metrics"):
                 self.sessions[session_id]["last_intent"]["last_metric"] = intent.metrics

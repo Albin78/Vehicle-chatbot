@@ -408,22 +408,33 @@ def extract_alert_response_type(query: str):
 
     q = query.lower()
 
-    count_phrases = [
+    daily_phrases = [
+        "daily alerts",
+        "alerts per day",
+        "daily breakdown",
+        "alert trend",
+        "what day",
+        "which day",
+        "day with most",
+        "day with highest"
+    ]
 
+    if any(phrase in q for phrase in daily_phrases):
+        return "daily_alert_summary"
+
+    count_phrases = [
         "count",
         "how many",
         "number of alerts",
+        "number of",
         "total alerts",
         "alerts count"
     ]
 
     if any(phrase in q for phrase in count_phrases):
-
         return "alert_count"
 
-
     distribution_phrases = [
-
         "distribution",
         "breakdown",
         "types of alerts",
@@ -456,18 +467,6 @@ def extract_alert_response_type(query: str):
     if any(phrase in q for phrase in overspeed_phrases):
 
         return "overspeed_summary"
-
-    daily_phrases = [
-
-        "daily alerts",
-        "alerts per day",
-        "daily breakdown",
-        "alert trend"
-    ]
-
-    if any(phrase in q for phrase in daily_phrases):
-
-        return "daily_alert_summary"
 
     return "full_alert_summary"
 
@@ -759,29 +758,20 @@ def post_validate(
             # Focused alert query
             # -------------------------------------
 
-            if alert_focus == "overspeed":
-
-                clean_data[
-                    "alert_response_type"
-                ] = "overspeed_summary"
-
+            # First, check if there's a specific question type being asked (count, latest, daily)
+            extracted_type = extract_alert_response_type(query)
+            
+            # If the user explicitly asked for a count, latest, or daily, we should respect that over the focus summary
+            if extracted_type in ["alert_count", "latest_alert", "daily_alert_summary"]:
+                clean_data["alert_response_type"] = extracted_type
+            elif alert_focus == "overspeed":
+                clean_data["alert_response_type"] = "overspeed_summary"
             elif alert_focus == "idling":
-
-                clean_data[
-                    "alert_response_type"
-                ] = "idling_summary"
-
+                clean_data["alert_response_type"] = "idling_summary"
             elif alert_focus == "afterhoursmovement":
-
-                clean_data[
-                    "alert_response_type"
-                ] = "afterhours_summary"
-
+                clean_data["alert_response_type"] = "afterhours_summary"
             else:
-
-                clean_data[
-                    "alert_response_type"
-                ] = extract_alert_response_type(query)
+                clean_data["alert_response_type"] = extracted_type
 
             # Apply time range defaulting for alerts
             defaulted = apply_default_alert_time_range(

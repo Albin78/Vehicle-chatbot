@@ -171,13 +171,15 @@ def preprocess_alerts(alerts):
             )
 
     peak_alert_day = None
+    peak_alert_count = None
 
     if daily_alerts:
-
-        peak_alert_day = max(
+        peak_item = max(
             daily_alerts.items(),
             key=lambda x: x[1]
-        )[0]
+        )
+        peak_alert_day = peak_item[0]
+        peak_alert_count = peak_item[1]
 
     most_common_alert = None
 
@@ -207,6 +209,9 @@ def preprocess_alerts(alerts):
 
         "peak_alert_day":
             peak_alert_day,
+            
+        "peak_alert_count":
+            peak_alert_count,
 
         "most_common_alert":
             most_common_alert
@@ -298,16 +303,20 @@ def build_alert_count_response(
     processed
 ):
 
+    total_alerts = len(alerts)
+    if getattr(intent, "alert_focus", None):
+        focus = intent.alert_focus.lower().replace("_", "").replace("-", "")
+        # The processed dict has an alert_distribution which contains counts for each alert type
+        total_alerts = 0
+        if "alert_distribution" in processed:
+            for k, v in processed["alert_distribution"].items():
+                if focus in k.lower().replace("_", "").replace("-", ""):
+                    total_alerts += v
+
     return {
-
-        "type":
-            "alert_count",
-
-        "vehicle":
-            intent.vehicle_id,
-
-        "total_alerts":
-            len(alerts)
+        "type": "alert_count",
+        "vehicle": intent.vehicle_id,
+        "total_alerts": total_alerts
     }
 
 
@@ -374,7 +383,10 @@ def build_daily_alert_summary_response(
             processed["daily_alerts"],
 
         "peak_alert_day":
-            processed["peak_alert_day"]
+            processed["peak_alert_day"],
+
+        "peak_alert_count":
+            processed["peak_alert_count"]
     }
 
 
@@ -412,6 +424,9 @@ def build_full_alert_summary_response(
 
         "peak_alert_day":
             processed["peak_alert_day"],
+
+        "peak_alert_count":
+            processed["peak_alert_count"],
 
         "latest_alert": {
 

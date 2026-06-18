@@ -91,9 +91,13 @@ def format_alert_count(
         "total_alerts",
         0
     )
+    
+    alert_type_str = "alerts"
+    if getattr(intent, "alert_focus", None):
+        alert_type_str = f"{intent.alert_focus.replace('_', ' ')} alerts"
 
     return (
-        f"{total_alerts} alerts were "
+        f"{total_alerts} {alert_type_str} were "
         f"recorded for vehicle "
         f"{intent.vehicle_id}."
     )
