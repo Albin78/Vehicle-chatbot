@@ -669,14 +669,10 @@ def format_full_alert_summary(
 
 def build_time_range_context(intent) -> str:
     """
-    Returns a human-readable period line when the time range was
-    auto-filled (not explicitly given by the user).
+    Returns a human-readable period line.
     e.g. "Data covers today (2026-05-25)."
          "Data covers the last 7 days (2026-05-18 to 2026-05-25)."
     """
-
-    if not getattr(intent, "alert_time_range_default", False):
-        return ""
 
     time_range = getattr(intent, "time_range", None)
     if not time_range or len(time_range) != 2:
