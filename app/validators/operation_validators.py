@@ -541,44 +541,46 @@ def _extract_fleet_fields(query: str) -> dict:
     # ---- FILTER (live status or alert type) -------------------------
     filt = None
 
-    if ("moving" in q or "vehicles are moving" in q) and metric != "moving_time":
-        filt = "moving"
-    elif ("idle" in q or "idling" in q) and metric != "idle_time":
-        filt = "idle"
-    elif ("stopped" in q or "stationary" in q) and metric != "stop_time":
-        filt = "stopped"
-    elif "out of network" in q or "out network" in q:
-        filt = "out_network"
-    elif "disconnected" in q:
-        filt = "disconnected"
-    elif metric == "alerts" and ("overspeed" in q or "over speed" in q):
-        filt = "overspeed"
-    elif metric == "alerts" and ("seatbelt" in q or "seat belt" in q):
-        filt = "seatbelt"
-    elif metric == "alerts" and ("afterhours" in q or "after hours" in q or "after-hours" in q):
-        filt = "afterhoursmovement"
-    elif metric == "alerts" and "idling" in q:
-        filt = "idling"
-    elif " on " in q or q.endswith(" on") or q.startswith("on "):
-        filt = "on"
-    elif " off " in q or q.endswith(" off") or q.startswith("off "):
-        filt = "off"
-    elif " open " in q or q.endswith(" open") or q.startswith("open "):
-        filt = "open"
-    elif " close" in q:
-        filt = "closed"
-    elif any(w in q for w in [" unfastened", "not fastened"]) or ("without" in q and "fastened" in q):
-        filt = "unfastened"
-    elif " fastened" in q:
-        filt = "fastened"
-    elif any(w in q for w in ["without seatbelt", "without seat belt", "no seatbelt", "no seat belt", "not having seatbelt", "not having seat belt"]):
-        filt = "disabled"
-    elif any(w in q for w in ["having seatbelt", "having seat belt", "with seatbelt", "with seat belt"]):
-        filt = "enabled"
-    elif " enabled" in q:
-        filt = "enabled"
-    elif " disabled" in q:
-        filt = "disabled"
+    if metric == "alerts":
+        if "overspeed" in q or "over speed" in q:
+            filt = "overspeed"
+        elif "seatbelt" in q or "seat belt" in q:
+            filt = "seatbelt"
+        elif "afterhours" in q or "after hours" in q or "after-hours" in q:
+            filt = "afterhoursmovement"
+        elif "idling" in q or "idle" in q:
+            filt = "idling"
+    else:
+        if ("moving" in q or "vehicles are moving" in q) and metric != "moving_time":
+            filt = "moving"
+        elif ("idle" in q or "idling" in q) and metric != "idle_time":
+            filt = "idle"
+        elif ("stopped" in q or "stationary" in q) and metric != "stop_time":
+            filt = "stopped"
+        elif "out of network" in q or "out network" in q:
+            filt = "out_network"
+        elif "disconnected" in q:
+            filt = "disconnected"
+        elif " on " in q or q.endswith(" on") or q.startswith("on "):
+            filt = "on"
+        elif " off " in q or q.endswith(" off") or q.startswith("off "):
+            filt = "off"
+        elif " open " in q or q.endswith(" open") or q.startswith("open "):
+            filt = "open"
+        elif " close" in q:
+            filt = "closed"
+        elif any(w in q for w in [" unfastened", "not fastened"]) or ("without" in q and "fastened" in q):
+            filt = "unfastened"
+        elif " fastened" in q:
+            filt = "fastened"
+        elif any(w in q for w in ["without seatbelt", "without seat belt", "no seatbelt", "no seat belt", "not having seatbelt", "not having seat belt"]):
+            filt = "disabled"
+        elif any(w in q for w in ["having seatbelt", "having seat belt", "with seatbelt", "with seat belt"]):
+            filt = "enabled"
+        elif " enabled" in q:
+            filt = "enabled"
+        elif " disabled" in q:
+            filt = "disabled"
 
     # ---- QUERY TYPE (fine-grained routing hint) ---------------------
     qtype = None
