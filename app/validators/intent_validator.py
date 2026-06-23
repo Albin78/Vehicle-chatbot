@@ -220,6 +220,8 @@ METRIC_SYNONYMS = {
     "location": "location",
     "current location": "location",
     "live location": "location",
+    "where": "location",
+    "where is": "location",
 
     "remote immobilization": "remote_immobilization",
     "immobilizer": "remote_immobilization",

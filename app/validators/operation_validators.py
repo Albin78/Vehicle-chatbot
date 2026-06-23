@@ -325,7 +325,7 @@ def detect_source(
         if any(w in q for w in ["how many", "total", "number of", "count"]) and any(w in q for w in ["alert", "violation", "overspeed", "idling", "overstay", "speeding"]):
             return "fleet_analytics"
             
-        if any(w in q for w in ["vehicles", "drivers", "trucks", "cars"]) and any(s in q for s in ["stopped", "moving", "idle", "idling", "disconnected", "out of network", "out network"]):
+        if any(w in q for w in ["vehicles", "drivers", "trucks", "cars"]) and any(s in q for s in ["stopped", "moving", "in motion", "idle", "idling", "disconnected", "out of network", "out network"]):
             return "fleet_analytics"
 
     # ALERT
@@ -690,10 +690,15 @@ def post_validate(
             vehicle_id = None
             if llm_id:
                 import re
-                llm_alpha = re.sub(r'[^A-Za-z0-9]', '', llm_id).lower()
-                query_alpha = re.sub(r'[^A-Za-z0-9]', '', query).lower()
-                if llm_alpha and llm_alpha in query_alpha:
-                    vehicle_id = llm_id
+                # A valid vehicle ID must contain at least one digit.
+                # Reject pure-alpha hallucinations like "IDLE", "STOPPED", "CURRENT".
+                if not re.search(r'\d', llm_id):
+                    vehicle_id = None
+                else:
+                    llm_alpha = re.sub(r'[^A-Za-z0-9]', '', llm_id).lower()
+                    query_alpha = re.sub(r'[^A-Za-z0-9]', '', query).lower()
+                    if llm_alpha and llm_alpha in query_alpha:
+                        vehicle_id = llm_id
                 
         logger.info(f"Vehicle extracted from extraction function/LLM: {vehicle_id}")
         

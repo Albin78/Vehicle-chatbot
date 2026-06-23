@@ -132,11 +132,10 @@ def interpret_metric_value(
 
             return unavailable_response(metric)
 
-        # latitude = value.get("latitude")
-
-        # longitude = value.get("longitude")
-
         map_url = value.get("google_maps_url")
+        if not map_url:
+            from app.utils.response_utils import build_google_maps_url
+            map_url = build_google_maps_url(value)
 
         # ---------------------------------------------
         # MAP URL PRIORITY
@@ -149,21 +148,6 @@ def interpret_metric_value(
                 "text":
                     f"current location: {map_url}"
             }
-
-        # ---------------------------------------------
-        # COORDINATES FALLBACK
-        # ---------------------------------------------
-
-        # if latitude is not None and longitude is not None:
-
-        #     return {
-        #         "available": True,
-        #         "text":
-        #             (
-        #                 "current location coordinates "
-        #                 f"are {latitude}, {longitude}"
-        #             )
-        #     }
 
         return unavailable_response(metric)
 

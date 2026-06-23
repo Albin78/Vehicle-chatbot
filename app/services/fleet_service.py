@@ -103,13 +103,12 @@ def handle_fleet_service(intent, plan, company_id: int) -> dict:
             vid_to_np[vid] = np
 
     if is_live_metrics_only:
-        logger.info("[FLEET SERVICE] Short-circuiting combined API call for live-only query.")
-        raw = {
-            "success": True,
-            "lastRecords": {"data": cache.get("data", [])},
-            "alerts": {},
-            "operationSummary": {}
-        }
+        logger.info("[FLEET SERVICE] Live-only query — calling combined API with today's date for lastRecords.")
+        raw = combined_report_fleet(
+            company_id=company_id,
+            from_date=today,
+            to_date=today
+        )
     else:
         raw = combined_report_fleet(
             company_id=company_id,

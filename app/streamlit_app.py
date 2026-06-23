@@ -48,6 +48,7 @@ with col2:
 # -------------------------
 if clear:
     st.session_state.history = []
+    st.session_state.session_id = str(uuid.uuid4())
 
 # -------------------------
 # Submit Logic

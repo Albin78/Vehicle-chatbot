@@ -8,7 +8,25 @@ def rewrite_query(current_query: str, history: List[Dict[str, str]], last_intent
         return current_query
     
     last_intent = last_intent or {}
-    last_vehicle_id = last_intent.get("last_vehicle_id", "None")
+    last_vehicle_id = last_intent.get("last_vehicle_id") or None
+    
+    # If there is no vehicle in context (e.g., after a fleet query) and the user
+    # is using pronouns that refer to a vehicle, we cannot resolve them.
+    # Return the original query so the downstream pipeline can ask for a vehicle ID
+    # instead of the LLM hallucinating a random vehicle from the response list.
+    if not last_vehicle_id:
+        import re
+        vehicle_pronouns = re.compile(
+            r'\b(its|it|this vehicle|the vehicle|that vehicle|this|these|those)\b', re.IGNORECASE
+        )
+        if vehicle_pronouns.search(current_query):
+            logger.info(
+                f"[QUERY REWRITER] No vehicle in context and query uses pronouns — "
+                f"skipping rewrite: {current_query}"
+            )
+            return current_query
+        # For non-pronoun follow-ups (fleet-to-fleet), set a safe placeholder
+        last_vehicle_id = "None"
     
     # Format history - Only use the LAST turn to prevent LLM confusion and hallucinations
     history_text = ""
@@ -21,14 +39,13 @@ Your ONLY job is to substitute pronouns (e.g., "it", "he", "this vehicle", "the 
 
 CRITICAL RULES:
 1. ALWAYS explicitly include the specific Vehicle Identifier (e.g., "1833 RXB") if it is mentioned in the history. Do NOT omit it for brevity. You MUST substitute phrases like "the vehicle" with the actual vehicle identifier.
-2. DO NOT change or guess metrics. Keep the user's exact phrasing for metrics. If the user asks a completely vague follow-up question like "on which day" or "what about the second one", you MUST include the relevant metric from the history. HOWEVER, if the user explicitly asks for "status" or "current status" (e.g. "current status of 1832RXB"), this is a complete question. DO NOT inject the previous metric (like seatbelt or speed) into it.
+2. DO NOT change or guess metrics. Keep the user's exact phrasing for metrics. If the user asks a new metric (like "current location", "speed", "status"), DO NOT copy the metric from the previous query.
 3. EXPLICIT VEHICLE CHECK: If the user's query ALREADY contains a specific vehicle identifier (like "1832RXB" or "6667 DKB") AND does not use any pronouns ("it", "this vehicle"), DO NOT REWRITE IT! Output the EXACT original query word-for-word.
 4. DO NOT change, add, rephrase, or omit time expressions (like "now", "last week", "june 12", "previous week") that the user typed. BUT, if the user's new query asks "on which day" or asks for a time without specifying the range, you MUST inject the time range from the history (e.g., "this week") into the rewritten query.
 5. DO NOT change an "alert" query into a "status" query. If the user asks about a "seatbelt alert", keep the words "seatbelt alert".
 6. If the User's query asks for "current", "now", or present-tense information, do NOT inject historical dates from the history.
-7. DO NOT copy metrics or alert types from the examples. ONLY use the metrics and alert types present in the user's actual query.
-7. Preserve the exact core question the user is asking. DO NOT invent conversational connections.
-8. NEVER inject metrics, alert types, or details from the History into the rewritten query UNLESS the user's query is a completely incomplete sentence fragment (like "on which day?"). For self-contained questions (e.g., "does it currently moving?", "which group does it belong to?", "does it equipped seatbelt"), ONLY replace pronouns with the explicit Vehicle ID or Driver Name.
+7. DO NOT copy metrics or alert types from the examples or the history. ONLY use the metrics and alert types present in the user's actual query.
+8. NEVER inject the previous question from the History into the rewritten query. If the user asks for "current location", do NOT output "who is the driver". ONLY replace pronouns with the explicit Vehicle ID.
 9. EXACT SUBSTITUTION: If the User query uses pronouns (like "this vehicle", "the vehicle", "it") or implicitly refers to the vehicle (like "who is the driver?", "what is its status?"), you MUST replace those pronouns with the vehicle ID "{last_vehicle_id}". Do NOT output the literal string "[Current Vehicle in Context]". Do NOT extract older vehicle IDs from the history text!
 10. PREVENT ALERT INJECTION: If the user asks about "equipped", "have", "feature", or "status" (e.g., "does it equipped seatbelt", "does it have seatbelt equipped"), DO NOT add the word "alert". The user is asking about vehicle configuration, not alerts. Keep the exact phrasing like "equipped seatbelt".
 11. TIME INJECTION FOR INCOMPLETE QUESTIONS: If the User query asks "on which day" or "when", you MUST inject the exact time expression from the most recent History (e.g., "this week", "last month") into your output. Additionally, you MUST explicitly state the actual subject of the previous sentence (e.g. "have its highest speed", "have its lowest speed") instead of using vague words like "happen" or "event". NEVER write "What happened".
@@ -72,6 +89,12 @@ History:
 Bot: "Vehicle 4671 JRB had the maximum idling time."
 User: "who is the driver?"
 Rewritten query: Who is the driver of vehicle 4671 JRB?
+
+Example 7:
+History:
+Bot: "The driver of vehicle 6667 DKB is Rubel Miah Fajul."
+User: "current location of this vehicle"
+Rewritten query: current location of vehicle 6667 DKB
 
 Now rewrite the following User query, incorporating the relevant context from the History. Do NOT echo the history. Output ONLY the rewritten query.
 History:
