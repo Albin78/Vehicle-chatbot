@@ -2,7 +2,6 @@ from app.parsers.date_parser import (
     format_time_generate
 )
 from app.utils.response_utils import build_google_maps_url
-from app.utils.logger import logger
 
 from app.response_generator.overspeed_formatter import format_overspeed_summary
 from app.response_generator.idling_formatter import format_idling_summary

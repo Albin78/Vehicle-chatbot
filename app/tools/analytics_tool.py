@@ -17,15 +17,12 @@ def run_analytics(imei, metric, operation):
     # logger.info(f"Values got from {metric}: {values}")
 
     if not values:
-        # logger.error("Empty result for IMEI: %s", imei)
-        print("Empty result for IMEI: ", imei)
+        logger.warning(f"Empty result for IMEI: {imei}")
         return None
 
     if operation == "average":
         average = np.mean(values)
-        print("Average: ", average)
-        # average_in_volt = np.round(average / 1000, 2)
-        # print("Average in Volt: ", average_in_volt)
+        logger.debug(f"Average: {average}")
         return {
             "type": "metric",
             "metric": metric,
@@ -35,7 +32,7 @@ def run_analytics(imei, metric, operation):
 
     if operation == "maximum":
         maximum = np.max(values)
-        print("Maximum: ", maximum)
+        logger.debug(f"Maximum: {maximum}")
         return {
             "type": "metric",
             "metric": metric,
@@ -45,7 +42,7 @@ def run_analytics(imei, metric, operation):
 
     if operation == "minimum":
         minimum = np.min(values)
-        print("Minimum: ", minimum)
+        logger.debug(f"Minimum: {minimum}")
         return {
             "type": "metric",
             "metric": metric,

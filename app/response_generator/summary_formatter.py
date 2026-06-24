@@ -1,8 +1,6 @@
 from app.parsers.date_parser import (
     format_time_generate
 )
-from app.utils.logger import logger
-
 # =========================================================
 # CONFIG
 # =========================================================

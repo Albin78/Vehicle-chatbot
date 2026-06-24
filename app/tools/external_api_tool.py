@@ -1,5 +1,5 @@
 import requests
-from typing_extensions import Optional, Any
+from typing import Optional
 from app.utils.logger import logger
 from app.config import settings
 from datetime import datetime

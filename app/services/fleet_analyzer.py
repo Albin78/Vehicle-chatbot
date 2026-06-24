@@ -56,6 +56,16 @@ class FleetAnalyzer:
         self.vn_to_np = {}
         self.vid_to_driver = {}
         self.np_to_driver = {}
+        
+        # O(1) Inverted Index for Fleet Status
+        self.status_index = {
+            "moving": [],
+            "idle": [],
+            "stopped": [],
+            "out_network": [],
+            "disconnected": []
+        }
+        
         for r in self.live_records:
             vn = r.get("vehicleName")
             np = r.get("numberPlate")
@@ -69,28 +79,7 @@ class FleetAnalyzer:
             if np and driver:
                 self.np_to_driver[np] = driver
 
-        logger.info(
-            f"[FLEET ANALYZER] live={len(self.live_records)} "
-            f"alerts={len(self.alerts)} op_rows={len(self.op_rows)}"
-        )
-
-    # =================================================================
-    # SECTION A — Live / Realtime  (lastRecords.data)
-    # Use for: current speed, status listing, fleet overview now
-    # =================================================================
-
-    def fleet_overview(self) -> dict:
-        """Overall fleet snapshot counts — total/moving/idle/stopped/etc."""
-        counts = {
-            "total": len(self.live_records),
-            "moving": 0,
-            "idle": 0,
-            "stopped": 0,
-            "out_network": 0,
-            "disconnected": 0
-        }
-        
-        for r in self.live_records:
+            # Calculate and index status
             raw_speed = r.get("speed")
             raw_ign = r.get("ignitionOn")
             v_status = r.get("vStatus")
@@ -120,17 +109,48 @@ class FleetAnalyzer:
                     except (ValueError, TypeError):
                         valid_metrics = False
             
+            assigned_status = None
             if valid_metrics and speed > 0.0 and ignition == 1:
-                counts["moving"] += 1
+                assigned_status = "moving"
             elif valid_metrics and ignition == 1 and speed == 0.0:
-                counts["idle"] += 1
+                assigned_status = "idle"
             elif valid_metrics and ignition == 0 and speed == 0.0:
-                counts["stopped"] += 1
+                assigned_status = "stopped"
             elif v_status == 4:
-                counts["out_network"] += 1
+                assigned_status = "out_network"
             elif v_status == 0:
-                counts["disconnected"] += 1
+                assigned_status = "disconnected"
                 
+            if assigned_status:
+                self.status_index[assigned_status].append({
+                    "vehicleName": r.get("vehicleName"),
+                    "numberPlate": r.get("numberPlate"),
+                    "driverName":  _clean_driver(r.get("driverName")),
+                    "speed":       speed,
+                    "lastUpdated": r.get("lastUpdatedTime"),
+                })
+
+        logger.info(
+            f"[FLEET ANALYZER] live={len(self.live_records)} "
+            f"alerts={len(self.alerts)} op_rows={len(self.op_rows)}"
+        )
+
+    # =================================================================
+    # SECTION A — Live / Realtime  (lastRecords.data)
+    # Use for: current speed, status listing, fleet overview now
+    # =================================================================
+
+    def fleet_overview(self) -> dict:
+        """Overall fleet snapshot counts — total/moving/idle/stopped/etc."""
+        counts = {
+            "total": len(self.live_records),
+            "moving": len(self.status_index["moving"]),
+            "idle": len(self.status_index["idle"]),
+            "stopped": len(self.status_index["stopped"]),
+            "out_network": len(self.status_index["out_network"]),
+            "disconnected": len(self.status_index["disconnected"])
+        }
+        
         # Fallback to API if we have no live records (edge case)
         if counts["total"] == 0:
             return {
@@ -145,65 +165,9 @@ class FleetAnalyzer:
         return counts
 
     def find_vehicles_by_status(self, status: str) -> list[dict]:
-        """List all vehicles matching a live status by checking ignition and speed."""
+        """List all vehicles matching a live status by checking the inverted index."""
         status = status.lower()
-        target_code = VSTATUS_REVERSE.get(status)
-
-        result = []
-        for r in self.live_records:
-            raw_speed = r.get("speed")
-            raw_ign = r.get("ignitionOn")
-            
-            def is_invalid(val):
-                if val is None: return True
-                if isinstance(val, str) and val.strip().lower() in ("", "na", "null", "nan"): return True
-                return False
-                
-            valid_metrics = not is_invalid(raw_speed) and not is_invalid(raw_ign)
-            speed = 0.0
-            ignition = 0
-            
-            if valid_metrics:
-                try:
-                    speed = float(raw_speed)
-                except (ValueError, TypeError):
-                    valid_metrics = False
-                    
-                if raw_ign in (1, "1", True, "true", "True"):
-                    ignition = 1
-                elif raw_ign in (0, "0", False, "false", "False"):
-                    ignition = 0
-                else:
-                    try:
-                        ignition = int(float(raw_ign))
-                    except (ValueError, TypeError):
-                        valid_metrics = False
-                
-            is_match = False
-            
-            if status == "idle":
-                if valid_metrics and ignition == 1 and speed == 0.0:
-                    is_match = True
-            elif status == "stopped":
-                if valid_metrics and ignition == 0 and speed == 0.0:
-                    is_match = True
-            elif status == "moving":
-                if valid_metrics and ignition == 1 and speed > 0.0:
-                    is_match = True
-            else:
-                # fallback for disconnected, out_network
-                if target_code is not None and r.get("vStatus") == target_code:
-                    is_match = True
-                    
-            if is_match:
-                result.append({
-                    "vehicleName": r.get("vehicleName"),
-                    "numberPlate": r.get("numberPlate"),
-                    "driverName":  _clean_driver(r.get("driverName")),
-                    "speed":       speed,
-                    "lastUpdated": r.get("lastUpdatedTime"),
-                })
-        return result
+        return self.status_index.get(status, [])
 
     def fastest_vehicle_now(self) -> dict:
         """Which vehicle has the highest live speed right now?"""
