@@ -236,6 +236,18 @@ def _dispatch(intent, analyzer: FleetAnalyzer) -> dict:
             **analyzer.most_alerts_vehicle(filt or None),
         }
 
+    # Which driver/vehicle/group had least alerts?
+    if metric == "alerts" and aggregation in {"minimum", "least"}:
+        if subject == "driver":
+            # Optional: implement least_alerts_driver in analyzer later if needed
+            return {"query_type": "fleet_overview", "overview": analyzer.fleet_overview()}
+        elif subject == "group":
+            return {"query_type": "fleet_overview", "overview": analyzer.fleet_overview()}
+        return {
+            "query_type": "bottom_alert_vehicle",
+            **analyzer.least_alerts_vehicle(filt or None),
+        }
+
     # Ranked alerts (Top N vehicles)
     is_ranking_query = bool(re.search(r'\btop\b', query_text) or re.search(r'\brank', query_text))
     if metric == "alerts" and (aggregation == "list" or qtype == "alert_list") and is_ranking_query:

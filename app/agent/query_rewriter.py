@@ -96,6 +96,12 @@ Bot: "The driver of vehicle 6667 DKB is Rubel Miah Fajul."
 User: "current location of this vehicle"
 Rewritten query: current location of vehicle 6667 DKB
 
+Example 8:
+History:
+Bot: "Vehicle 1832RXB has an average speed of 65 km/h."
+User: "current speed of 1832RXB"
+Rewritten query: current speed of 1832RXB
+
 Now rewrite the following User query, incorporating the relevant context from the History. Do NOT echo the history. Output ONLY the rewritten query.
 History:
 {history_text}

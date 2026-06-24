@@ -551,7 +551,7 @@ def _extract_fleet_fields(query: str) -> dict:
         elif "idling" in q or "idle" in q:
             filt = "idling"
     else:
-        if ("moving" in q or "vehicles are moving" in q) and metric != "moving_time":
+        if ("moving" in q or "in motion" in q or "vehicles are moving" in q) and metric != "moving_time":
             filt = "moving"
         elif ("idle" in q or "idling" in q) and metric != "idle_time":
             filt = "idle"

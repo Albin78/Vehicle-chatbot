@@ -548,6 +548,56 @@ class FleetAnalyzer:
             "alertType":   alert_type or "all",
             "alertDistribution": dict(vehicle_distributions[vehicle_np])
         }
+
+    def least_alerts_vehicle(
+        self, alert_type: Optional[str] = None
+    ) -> dict:
+        """Which vehicle had the least alerts (of a given type)?"""
+        filtered = self.filter_alerts_by_type(alert_type)
+        
+        counts = defaultdict(int)
+        drivers = {}
+        groups = {}
+        vehicle_distributions = defaultdict(lambda: defaultdict(int))
+        
+        for r in self.live_records:
+            np = r.get("numberPlate") or self.vn_to_np.get(r.get("vehicle", ""), None)
+            if np:
+                counts[np] = 0
+                drivers[np] = _clean_driver(r.get("driverName"))
+                groups[np] = r.get("groupName", "Unknown")
+
+        for a in filtered:
+            vn = a.get("VehicleName")
+            np = a.get("NumberPlate") or self.vn_to_np.get(vn, vn)
+            if not np:
+                continue
+                
+            counts[np] += 1
+            
+            gn = a.get("GroupName")
+            if gn and str(gn).strip() not in ("", "None", "Unknown"):
+                groups[np] = gn
+                
+            raw_driver = a.get("DriverName")
+            if raw_driver:
+                drivers[np] = _clean_driver(raw_driver)
+                
+            alert_name = a.get("AlertName", "Unknown")
+            vehicle_distributions[np][alert_name] += 1
+                
+        if not counts:
+            return {}
+            
+        vehicle_np, count = min(counts.items(), key=lambda x: x[1])
+        return {
+            "numberPlate": vehicle_np,
+            "driverName":  drivers.get(vehicle_np),
+            "groupName":   groups.get(vehicle_np, "Unknown"),
+            "alertCount":  count,
+            "alertType":   alert_type or "all",
+            "alertDistribution": dict(vehicle_distributions[vehicle_np])
+        }
     def rank_vehicles_by_alerts(
         self, alert_type: Optional[str] = None, top_n: int = 10
     ) -> list[dict]:

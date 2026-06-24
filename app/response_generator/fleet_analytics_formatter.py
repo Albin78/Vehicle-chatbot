@@ -94,7 +94,7 @@ def format_fleet_analytics(result: dict) -> str:
         group = result.get("groupName")
         group_str = f" (Group: '{group}')" if group and group not in ("Unknown", "None", "") else ""
         
-        if q_type in ("top_alert_vehicle", "top_alert_driver", "top_alert_group"):
+        if q_type in ("top_alert_vehicle", "top_alert_driver", "top_alert_group", "bottom_alert_vehicle", "bottom_alert_driver", "bottom_alert_group"):
             val = result.get('alertCount', 0)
             alert_type = result.get('alertType', 'all')
             metric = "alerts" if alert_type == "all" else f"{alert_type} alerts"
@@ -120,14 +120,14 @@ def format_fleet_analytics(result: dict) -> str:
         if val in (0, "0", "0s", 0.0) and q_type.startswith("top_"):
             return f"No {subject}s recorded any {metric} {tr_str}."
         
-        if q_type in ("top_alert_vehicle", "top_alert_driver", "top_alert_group"):
+        if q_type in ("top_alert_vehicle", "top_alert_driver", "top_alert_group", "bottom_alert_vehicle", "bottom_alert_driver", "bottom_alert_group"):
             
             dist = result.get("alertDistribution", {})
             dist_str = ""
             if dist:
                 dist_str = " Breakdown: " + ", ".join(f"{k}: {v}" for k, v in dist.items()) + "."
                 
-            if q_type == "top_alert_driver":
+            if q_type in ("top_alert_driver", "bottom_alert_driver"):
                 driver_display = "driver details not currently available" if is_driver_unavailable else f"'{driver_formatted}'"
                 if plate and plate != "Unknown" and plate != "Unknown Vehicle":
                     return (
@@ -139,7 +139,7 @@ def format_fleet_analytics(result: dict) -> str:
                         f"Driver {driver_display}{group_str} had {qualifier} number of {metric} "
                         f"with a total of {val} {tr_str}.{dist_str}"
                     )
-            elif q_type == "top_alert_group":
+            elif q_type in ("top_alert_group", "bottom_alert_group"):
                 return (
                     f"Group '{group}' had {qualifier} number of {metric} "
                     f"with a total of {val} {tr_str}.{dist_str}"

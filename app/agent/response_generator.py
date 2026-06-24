@@ -41,7 +41,7 @@ def generate_response(result, intent):
             "- Strictly output ONLY the final report itself and absolutely nothing else.\n"
             "- Use clean Markdown bullet points.\n"
             "- DRIVER RULE: If the driver is 'null', 'NA', 'None', 'Unknown', or 'Unassigned', state that 'driver details are not currently available' rather than 'Driver NA', 'Driver null', or 'Driver Unknown'.\n"
-            "- VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name' (e.g. do not change 'Vehicle 1342 ABC' into 'Vehicle ID: 1342, Name: ABC'). Treat the entire identifier as a single immutable string.\n"
+            "- VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name'. Treat the entire identifier as a single immutable string. Do NOT invent vehicle identifiers.\n"
             "\n"
             "<example>\n"
             "INPUT: Vehicle ABC-123 of type Truck belongs to group Alpha Fleet. For the period Oct 01 to Oct 02. Total distance traveled was 150 km. Total moving time was 03:00:00. Total idle time was 00:30:00. Total stop time was 44:30:00. Highest speed recorded was 80 km/h on Oct 02. Average daily maximum speed across 2 days was 77.5 km/h. On Oct 01, distance traveled was 50 km, maximum speed reached 75 km/h, moving time was 01:00:00, idle time was 00:10:00, and stop time was 22:50:00. On Oct 02, distance traveled was 100 km, maximum speed reached 80 km/h, moving time was 02:00:00, idle time was 00:20:00, and stop time was 21:40:00.\n"
@@ -77,7 +77,7 @@ def generate_response(result, intent):
             "- Use clean Markdown bullet points.\n"
             "- For descriptive fields (camera, seatbelt, ignition, door, immobilization, tanker_status, gsm_signal), preserve the exact descriptive phrase from INPUT.\n"
             "- DRIVER RULE: If the driver is 'null', 'NA', 'None', 'Unknown', or 'Unassigned', output 'driver details are not currently available' instead of 'driver is NA', 'driver is null', or 'driver assigned is Unknown'.\n"
-            "- VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name' (e.g. do not change 'Vehicle 1342 ABC' into 'Vehicle ID: 1342, Name: ABC'). Treat the entire identifier as a single immutable string.\n"
+            "- VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name'. Treat the entire identifier as a single immutable string. Do NOT invent vehicle identifiers.\n"
             "\n"
             "<example>\n"
             "INPUT: Vehicle 1832 RXB is currently stopped with the engine off. Fuel level is 0.0%. Vehicle has a fuel capacity of 400 L. The tanker has a fuel capacity of 8000 L. Tanker fuel level is 0.0%. Battery voltage is 13.5 V. Vehicle 1832 RXB is classified as a can. Vehicle type is Pick Up. Manufacturer is Isuzu and model is DOUBLE CABIN 2022. Vehicle is a can and belongs to Flames Hydraulic Co, Info, Others, Test Group. Driver assigned is Vipin. The ignition is off. The seatbelt is equipped but not fastened. Vehicle supports remote immobilization and is not currently remotely immobilized. Vehicle 1832 RXB has a good GSM signal with value of 5. Location map: https://www.google.com/maps?q=26.4325149,50.1023883. Last updated May 26, 2026 06:55 AM UTC. Camera IMEI is 940076337414. IMEI is 868963040937609. Odometer reading is 12345.6 km. camera is equipped with 1 camera channel.\n"
@@ -100,14 +100,14 @@ def generate_response(result, intent):
             "You are a professional fleet management chatbot. Your task is to rewrite the fleet analytics INPUT below into a natural, friendly, and highly professional OUTPUT response.\n"
             "\n"
             "CRITICAL CONTRACT:\n"
-            "1. EXACT FACTS ONLY: You MUST ONLY use the exact facts, vehicles, numbers, and data points provided in the INPUT. Do NOT omit important context (like the specific status being queried). NEVER fabricate, invent, or add fake vehicles (e.g., '12345 XYZ'), fake drivers (e.g., 'Smith', 'Johnson'), or fake dates.\n"
+            "1. EXACT FACTS ONLY: You MUST ONLY use the exact facts, vehicles, numbers, and data points provided in the INPUT. Do NOT omit important context (like the specific status being queried). NEVER fabricate, invent, or add fake vehicles, fake drivers, or fake dates.\n"
             "2. NO FILLER: Do not add introductory headers (e.g., 'Here is the data:'), extra commentary, conversational filler, or 'Note:' sections.\n"
             "3. PRESERVE LISTS: If the INPUT contains a list of vehicles, preserve them as a clean bulleted list. IMPORTANT: If the USER_QUERY asks to filter by a specific group, status, or condition (e.g., 'in the Others group', 'without a camera'), you MUST filter the INPUT list to ONLY include vehicles that match the user's criteria.\n"
             "4. NO QUOTES: Do not add quotation marks around vehicle names, group names, driver names, metrics, or statuses.\n"
             "5. DRIVERS & ENTITIES: Treat driver names and group names as single immutable entities. If driver details are explicitly present in the INPUT and the driver is 'null', 'NA', 'None', 'Unknown', or 'Unassigned', output 'driver details are not currently available'. If drivers are NOT mentioned in the INPUT, DO NOT mention drivers at all in your OUTPUT.\n"
-            "6. VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name' (e.g. do not change 'Vehicle 1342 ABC' into 'Vehicle ID: 1342, Name: ABC'). Treat the entire identifier as a single immutable string.\n"
+            "6. VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name'. Treat the entire identifier as a single immutable string. Do NOT invent vehicle identifiers.\n"
             "7. DIRECT ANSWER: Ensure your response directly and explicitly answers the core question asked in the USER_QUERY. Do not bury the answer in a generic summary.\n"
-            "8. DATE RANGE: Always explicitly mention the exact date range in your response if it is provided in the INPUT (e.g., 'between June 15th and June 22nd').\n"
+            "8. DATE RANGE: Always explicitly mention the exact date range in your response if it is provided in the INPUT (e.g., 'between [Start Date] and [End Date]'). Do NOT invent or copy dates from these instructions; use ONLY the dates provided in the INPUT.\n"
             "\n"
             "Strictly output ONLY the polished response and absolutely nothing else.\n"
             "\n"
@@ -124,14 +124,20 @@ def generate_response(result, intent):
             "2. NO FILLER: Do not add any introductory header, extra commentary, notes, parenthetical explanations, or conversational filler under any circumstances. For example, never output '(Note: ...)' or any explanation of formatting changes.\n"
             "3. Strictly output ONLY the rewritten output itself and absolutely nothing else.\n"
             "4. Write in short, professional sentence style. No bullet points, no pipes, no labels unless it's a long list.\n"
+            "5. NO PREAMBLE OR CONVERSATIONAL FILLER: NEVER use phrases like 'Since the INPUT indicates', 'Here is a rewritten version', or 'The output should reflect this'. Output ONLY the final data-driven sentence.\n"
             "- SPEED & MOVEMENT RULE:\n"
             "  * If Speed is exactly '0 km/h', interpret and describe it as being 'stationary' or 'stopped' (e.g. 'is currently stationary at 0 km/h' or 'is stopped at 0 km/h'). Never just print raw 0 km/h without describing it as stationary or stopped.\n"
             "  * If Speed is greater than '0 km/h', describe it as 'moving' (e.g. 'is currently moving at 45 km/h').\n"
             "- For descriptive fields (camera, seatbelt, ignition, door, immobilization, tanker_status, gsm_signal), preserve the exact descriptive phrase from INPUT.\n"
-            "- DRIVER RULE: If driver details are explicitly present in the INPUT and the driver is 'null', 'NA', 'None', 'Unknown', or 'Unassigned', output 'driver details are not currently available'. Do not mention drivers at all if they are not included in the INPUT.\n"
-            "- VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name' (e.g. do not change 'Vehicle 1342 ABC' into 'Vehicle ID: 1342, Name: ABC'). Treat the entire identifier as a single immutable string.\n"
+            "- DRIVER RULE: If driver details are explicitly present in the INPUT and the driver is 'null', 'NA', 'None', 'Unknown', or 'Unassigned', output 'driver details are not currently available' or 'does not have a driver assigned'. Do not mention drivers at all if they are not included in the INPUT.\n"
+            "- VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name'. Treat the entire identifier as a single immutable string. Do NOT invent vehicle identifiers.\n"
             "7. DIRECT ANSWER: Ensure your response directly and explicitly answers the core question asked in the USER_QUERY using the facts from the INPUT. For example, if the user asks 'on which day', highlight that day clearly. If the user asks for a specific metric, highlight it prominently.\n"
-            "8. DATE RANGE: Always explicitly mention the exact date range in your response if it is provided in the INPUT (e.g., 'Data covers the last 7 days (2026-05-18 to 2026-05-25)' or 'between June 15th and June 22nd').\n"
+            "8. DATE RANGE: Always explicitly mention the exact date range in your response if it is provided in the INPUT (e.g., 'between [Start Date] and [End Date]'). Do NOT invent or copy dates from these instructions; use ONLY the dates provided in the INPUT.\n"
+            "\n"
+            "<example>\n"
+            "INPUT: For vehicle 4671 JRB, driver name data is unavailable.\n"
+            "OUTPUT: Vehicle 4671 JRB does not have a driver assigned.\n"
+            "</example>\n"
             "\n"
             "<example>\n"
             "INPUT: For vehicle 1832 RXB, vehicle is a can.\n"
@@ -200,7 +206,7 @@ def generate_response(result, intent):
 
     # Strip LLM hallucinated preambles
     import re
-    response = re.sub(r'^(Here is|Based on|I can help|Sure|Yes).*?:\s*', '', response, flags=re.IGNORECASE)
+    response = re.sub(r'^(Here is|Based on|I can help|Sure|Yes|The output).*?:\s*\n*', '', response, flags=re.IGNORECASE)
     response = re.sub(r'^\*\*(.*?)\*\*\n*', '', response)
 
     if result.get("type") == "summary":

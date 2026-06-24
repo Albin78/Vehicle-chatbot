@@ -101,3 +101,7 @@ test.py
 comprehensive_test_cases.txt
 test_production.py
 test__*.*
+
+*.txt
+production_test_report.md
+run_prod_tests.py
