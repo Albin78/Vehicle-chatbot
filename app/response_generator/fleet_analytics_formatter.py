@@ -74,6 +74,33 @@ def format_fleet_analytics(result: dict) -> str:
             f"Alert distribution: {dist_str}."
         )
 
+    if q_type == "fleet_vehicle_alert_list":
+        vehicles = result.get("vehicles", [])
+        alert_type = result.get("alertType", "all")
+        if alert_type == "all":
+            alert_label = ""
+        else:
+            import re
+            alert_label = re.sub(r'([a-z])([A-Z])', r'\1 \2', alert_type).lower()
+            
+        alert_phrase = f"{alert_label} alert" if alert_label else "alert"
+
+        if not vehicles:
+            return f"No vehicles had {alert_phrase}s {tr_str}."
+
+        lines = []
+        for v in vehicles:
+            np = v.get("numberPlate", "Unknown")
+            count = v.get("alertCount", 0)
+            event_word = "alert" if count == 1 else "alerts"
+            lines.append(f"• {np} ({count} {event_word})")
+
+        header = (
+            f"The following {len(vehicles)} vehicle{'s' if len(vehicles) != 1 else ''} "
+            f"had {alert_phrase}s {tr_str}:"
+        )
+        return header + "\n" + "\n".join(lines)
+
     if q_type == "fleet_alert_distribution":
         dist = result.get("distribution", {})
         if not dist:

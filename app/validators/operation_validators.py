@@ -141,6 +141,10 @@ ALERT_TYPE_SYNONYMS = {
     "low battery": "lowBattery",
     "rash driving": "rashDriving",
     "harsh driving": "rashDriving",
+    "harsh break": "rashDriving",
+    "harsh braking": "rashDriving",
+    "hard break": "rashDriving",
+    "hard braking": "rashDriving",
     "continuous": "continuous",
     "territory": "territory",
     "geofence": "territory",
@@ -316,16 +320,29 @@ def detect_source(
         "drivers moving", "drivers stopped", "drivers idle", "drivers idling",
         "drivers are moving", "drivers are stopped", "drivers are idle", "drivers are idling",
     ]
-    
-    # If a specific vehicle ID was already resolved, this is a single-vehicle query, not a fleet query.
+
+    # If a specific vehicle ID was already resolved, this is a single-vehicle query, not fleet.
     if not vehicle_id:
         if any(kw in q for kw in fleet_keywords):
             return "fleet_analytics"
-            
+
         if any(w in q for w in ["how many", "total", "number of", "count"]) and any(w in q for w in ["alert", "violation", "overspeed", "idling", "overstay", "speeding"]):
             return "fleet_analytics"
-            
+
         if any(w in q for w in ["vehicles", "drivers", "trucks", "cars"]) and any(s in q for s in ["stopped", "moving", "in motion", "idle", "idling", "disconnected", "out of network", "out network"]):
+            return "fleet_analytics"
+
+        # ---------------------------------------------------------------
+        # SEMANTIC FLEET RULE (production-safe, phrasing-independent):
+        # If no vehicle ID was resolved and the query is about alerts /
+        # overspeed / violations, it can only be a fleet-wide query.
+        # This single rule covers every phrasing variation without
+        # requiring keyword maintenance.
+        # ---------------------------------------------------------------
+        if extract_alert_focus(q) is not None or any(w in q for w in [
+            "alert", "alerts", "overspeed", "overspeeding",
+            "violation", "violations", "speeding"
+        ]):
             return "fleet_analytics"
 
     # ALERT
@@ -517,7 +534,23 @@ def _extract_fleet_fields(query: str) -> dict:
     metric = None
 
     import re
-    if any(w in q for w in ["alert", "alerts", "violation", "violations"]):
+    # Check for alert-list intent: "which vehicles overspeed today" or "havign idling this week"
+    _has_ranking = any(w in q for w in ["highest", "maximum", "max", "most", "peak", "worst", "fastest", "top", "lowest", "minimum", "min", "least", "slowest"])
+    
+    alert_focus_list = extract_alert_focus(q)
+    is_historical_list = False
+    
+    if alert_focus_list and not _has_ranking:
+        # Unambiguous alerts (like overspeed) always default to alert list.
+        # Ambiguous terms (idling, seatbelt) require a time word or 'had'/'having' to distinguish from live status queries.
+        if alert_focus_list not in ["idling", "seatbelt"]:
+            is_historical_list = True
+        elif any(w in q for w in ["alert", "alerts", "violation", "violations", "today", "yesterday", "week", "month", "days", "had", "having", "havign"]):
+            is_historical_list = True
+
+    if is_historical_list:
+        metric = "alerts"
+    elif any(w in q for w in ["alert", "alerts", "violation", "violations"]):
         metric = "alerts"
     elif any(w in q for w in ["speed", "overspeed", "fastest", "slowest"]) or re.search(r'\bfast\b', q):
         metric = "speed"
@@ -604,6 +637,12 @@ def _extract_fleet_fields(query: str) -> dict:
             subject = "vehicle"
             filt = alert_focus
     elif metric == "alerts" and aggregation == "list":
+        qtype = "alert_list"
+
+    # When user asks for a list of alert vehicles (no ranking word),
+    # correct aggregation and qtype accordingly.
+    if metric == "alerts" and qtype is None and not _has_ranking:
+        aggregation = "list"
         qtype = "alert_list"
 
     if metric == "alerts" and filt is None:

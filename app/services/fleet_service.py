@@ -82,9 +82,16 @@ def handle_fleet_service(intent, plan, company_id: int) -> dict:
 
     time_range_altered_to_week = False
     if not is_live_metrics_only and not is_current_query and from_date == today and to_date == today:
-        # For historical operation summaries requested strictly for today, back off to a week
-        from_date, to_date = week_ago, today
-        time_range_altered_to_week = True
+        # Alert data is available intraday — only operation summary data (distance, idle,
+        # moving time, etc.) needs a backoff because it is processed nightly.
+        # Never override an explicit "today" request for alert queries.
+        is_alert_query = metric == "alerts" or qtype in (
+            "alert_list", "alert_count", "fleet_alert_list",
+            "fleet_vehicle_alert_list", "fleet_alert_count", "alert_distribution"
+        )
+        if not is_alert_query:
+            from_date, to_date = week_ago, today
+            time_range_altered_to_week = True
 
     logger.info(
         f"[FLEET SERVICE] fleet_analytics | "
@@ -257,12 +264,12 @@ def _dispatch(intent, analyzer: FleetAnalyzer) -> dict:
             "ranked":     analyzer.rank_vehicles_by_alerts(filt or None, top_n=top_n),
         }
 
-    # List alert events
+    # List vehicles that had alerts (deduplicated — one entry per vehicle)
     if qtype == "alert_list" or (metric == "alerts" and aggregation == "list"):
         return {
-            "query_type": "fleet_alert_list",
+            "query_type": "fleet_vehicle_alert_list",
             "alertType":  filt or "all",
-            "alerts":     analyzer.list_alerts_summary(filt or None),
+            "vehicles":   analyzer.vehicles_with_alerts(filt or None),
         }
 
     # --------------------------------------------------

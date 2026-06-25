@@ -677,6 +677,47 @@ class FleetAnalyzer:
 
 
 # =========================================================
+
+    def vehicles_with_alerts(self, alert_type=None):
+        """
+        Returns one entry per unique vehicle that triggered alerts of the
+        given type, sorted by alert count descending.
+
+        Used for queries like 'which vehicles had overspeed today' where
+        the user wants a vehicle list, not individual event details.
+        """
+        filtered = self.filter_alerts_by_type(alert_type)
+
+        counts = {}
+        drivers = {}
+        groups = {}
+
+        for a in filtered:
+            vn = a.get("VehicleName")
+            np = a.get("NumberPlate") or self.vn_to_np.get(vn, vn)
+            if not np:
+                continue
+
+            counts[np] = counts.get(np, 0) + 1
+
+            raw_driver = a.get("DriverName")
+            if raw_driver:
+                drivers[np] = _clean_driver(raw_driver)
+
+            gn = a.get("GroupName")
+            if gn and str(gn).strip() not in ("", "None", "Unknown"):
+                groups[np] = gn
+
+        return [
+            {
+                "numberPlate": np,
+                "driverName":  drivers.get(np, "Unassigned"),
+                "groupName":   groups.get(np, ""),
+                "alertCount":  count,
+            }
+            for np, count in sorted(counts.items(), key=lambda x: x[1], reverse=True)
+        ]
+
 # PRIVATE HELPERS
 # =========================================================
 
