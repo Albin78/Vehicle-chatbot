@@ -110,16 +110,16 @@ class FleetAnalyzer:
                         valid_metrics = False
             
             assigned_status = None
-            if valid_metrics and speed > 0.0 and ignition == 1:
+            if v_status == 4:
+                assigned_status = "out_network"
+            elif v_status == 0:
+                assigned_status = "disconnected"
+            elif valid_metrics and speed > 0.0 and ignition == 1:
                 assigned_status = "moving"
             elif valid_metrics and ignition == 1 and speed == 0.0:
                 assigned_status = "idle"
             elif valid_metrics and ignition == 0 and speed == 0.0:
                 assigned_status = "stopped"
-            elif v_status == 4:
-                assigned_status = "out_network"
-            elif v_status == 0:
-                assigned_status = "disconnected"
                 
             if assigned_status:
                 self.status_index[assigned_status].append({

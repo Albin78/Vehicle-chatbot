@@ -504,6 +504,7 @@ def _extract_fleet_fields(query: str) -> dict:
     """
     import re
     q = re.sub(r'[?.,!]', '', query.lower())
+    qtype = None  # May be overridden by multi-status detection before the QUERY TYPE section
 
     # ---- SUBJECT: driver vs vehicle vs group ------------------------
     if any(w in q for w in ["which driver", "what driver", "who drove", "who was speeding", "who is speeding", "top driver"]):
@@ -584,16 +585,23 @@ def _extract_fleet_fields(query: str) -> dict:
         elif "idling" in q or "idle" in q:
             filt = "idling"
     else:
+        status_matches = []
         if ("moving" in q or "in motion" in q or "vehicles are moving" in q) and metric != "moving_time":
-            filt = "moving"
-        elif ("idle" in q or "idling" in q) and metric != "idle_time":
-            filt = "idle"
-        elif ("stopped" in q or "stationary" in q) and metric != "stop_time":
-            filt = "stopped"
-        elif "out of network" in q or "out network" in q:
-            filt = "out_network"
-        elif "disconnected" in q:
-            filt = "disconnected"
+            status_matches.append("moving")
+        if ("idle" in q or "idling" in q) and metric != "idle_time":
+            status_matches.append("idle")
+        if ("stopped" in q or "stationary" in q) and metric != "stop_time":
+            status_matches.append("stopped")
+        if "out of network" in q or "out network" in q:
+            status_matches.append("out_network")
+        if "disconnected" in q:
+            status_matches.append("disconnected")
+            
+        if len(status_matches) > 1:
+            qtype = "fleet_overview"
+            metric = "status"
+        elif len(status_matches) == 1:
+            filt = status_matches[0]
         elif " on " in q or q.endswith(" on") or q.startswith("on "):
             filt = "on"
         elif " off " in q or q.endswith(" off") or q.startswith("off "):
@@ -616,7 +624,9 @@ def _extract_fleet_fields(query: str) -> dict:
             filt = "disabled"
 
     # ---- QUERY TYPE (fine-grained routing hint) ---------------------
-    qtype = None
+    # Only initialize qtype if it was not already set by multi-status detection above
+    if not qtype:
+        qtype = None
 
     if any(w in q for w in ["fleet status", "fleet overview", "how many vehicles"]):
         qtype = "fleet_overview"

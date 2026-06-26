@@ -108,6 +108,7 @@ def generate_response(result, intent):
             "6. VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name'. Treat the entire identifier as a single immutable string. Do NOT invent vehicle identifiers.\n"
             "7. DIRECT ANSWER: Ensure your response directly and explicitly answers the core question asked in the USER_QUERY. Do not bury the answer in a generic summary.\n"
             "8. DATE RANGE: Always explicitly mention the exact date range in your response if it is provided in the INPUT (e.g., 'between [Start Date] and [End Date]'). Do NOT invent or copy dates from these instructions; use ONLY the dates provided in the INPUT.\n"
+            "9. STATUS COUNTS: When the INPUT contains vehicle status counts (Moving, Idle, Stopped, Out of network, Disconnected), you MUST include ALL status categories in your OUTPUT, even if their count is 0. Never omit a status category just because it has zero vehicles.\n"
             "\n"
             "Strictly output ONLY the polished response and absolutely nothing else.\n"
             "\n"

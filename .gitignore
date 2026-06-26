@@ -105,3 +105,5 @@ test__*.*
 *.txt
 production_test_report.md
 run_prod_tests.py
+
+test_architecture_audit.py
