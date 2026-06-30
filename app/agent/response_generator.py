@@ -116,6 +116,24 @@ def generate_response(result, intent):
             f"INPUT: {base_message}\n"
             "OUTPUT:"
         )
+    elif result.get("type") in ["alert_summary", "overspeed_summary", "idling_summary", "afterhours_summary", "daily_alert_summary"]:
+        prompt = (
+            "You are a professional fleet management chatbot. Your task is to rewrite the vehicle alert INPUT below into a natural, friendly, and highly professional OUTPUT response.\n"
+            "\n"
+            "CRITICAL CONTRACT:\n"
+            "1. EXACT FACTS ONLY: You MUST ONLY use the exact facts, dates, numbers, and locations provided in the INPUT. NEVER fabricate or invent information.\n"
+            "2. NO FILLER: Do not add introductory headers, extra commentary, conversational filler, or 'Note:' sections.\n"
+            "3. PRESERVE STRUCTURE: If the INPUT contains bullet points, a breakdown, or a list, you MUST preserve them as a clean bulleted list in Markdown format.\n"
+            "4. NO QUOTES: Do not add quotation marks around names or metrics.\n"
+            "5. DIRECT ANSWER: Ensure your response directly and explicitly answers the core question asked in the USER_QUERY using the facts from the INPUT.\n"
+            "6. LOCATION URLS: If a Google Maps URL is present, preserve it completely as a clickable link.\n"
+            "\n"
+            "Strictly output ONLY the polished response and absolutely nothing else.\n"
+            "\n"
+            f"USER_QUERY: {query_str}\n"
+            f"INPUT: {base_message}\n"
+            "OUTPUT:"
+        )
     else:
         prompt = (
             "You are a professional fleet management chatbot. Your task: rewrite the telemetry INPUT below into a natural, friendly, and highly professional OUTPUT sentence.\n"
