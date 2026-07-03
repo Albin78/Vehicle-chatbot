@@ -86,6 +86,10 @@ def compute_metric(rows, metric, aggregation, query_string=""):
             elif "total distance" in q: specific_agg = "total"
 
     # Determine default behavior
+    # BUG FIX: result_date was only assigned inside maximum/minimum/average/else
+    # branches but NOT in the distance/idle_time sum branches, causing an
+    # UnboundLocalError crash when aggregation is None for time-metric queries.
+    result_date = None   # safe default — overridden where a date is meaningful
     if metric in ["distance", "distance_travelled"] and specific_agg != "average":
         result = sum(values)
         if specific_agg not in ["maximum", "minimum"]:
@@ -104,10 +108,8 @@ def compute_metric(rows, metric, aggregation, query_string=""):
         result_date = rows[min_idx].get("Date") or rows[min_idx].get("ReportDate") or rows[min_idx].get("DateString")
     elif specific_agg == "average":
         result = sum(values) / len(values)
-        result_date = None
     else:
         result = sum(values) if specific_agg == "total" else values[-1]
-        result_date = None
         
     if is_time_metric:
         val = format_seconds(result)

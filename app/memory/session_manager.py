@@ -18,9 +18,10 @@ class SessionManager:
         if session_id not in self.sessions:
             self.sessions[session_id] = {"history": [], "last_intent": {}}
         
-        # Keep last 3 turns
+        # Fix #8: keep only 1 turn — query_rewriter uses only history[-1],
+        # so storing more than 1 turn wastes memory with no benefit.
         self.sessions[session_id]["history"].append({"query": query, "response": response})
-        if len(self.sessions[session_id]["history"]) > 3:
+        if len(self.sessions[session_id]["history"]) > 1:
             self.sessions[session_id]["history"].pop(0)
 
         # Store last intent specifics

@@ -1,18 +1,47 @@
+import os
+import signal
+import sys
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Request
-
 from fastapi.responses import JSONResponse
-
-from fastapi.exceptions import (
-    RequestValidationError
-)
+from fastapi.exceptions import RequestValidationError
+import requests
 
 from app.api.route import router
 from app.utils.logger import logger
+from app.config import settings
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: preload the Ollama model
+    logger.info("Starting up: preloading model...")
+    try:
+        # Dummy request to wake up/load the model in Ollama
+        requests.post(
+            f"{settings.OLLAMA_URL}",
+            json={
+                "model": settings.OLLAMA_MODEL,
+                "prompt": "ping",
+                "stream": False
+            },
+            timeout=5
+        )
+        logger.info("Model preloaded successfully.")
+    except Exception as e:
+        logger.warning(f"Could not preload model: {e}")
+        
+    yield
+    # Shutdown
+    logger.info("Shutting down application...")
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
 app.include_router(router)
 

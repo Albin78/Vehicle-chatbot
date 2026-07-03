@@ -71,7 +71,7 @@ if submit:
                         "session_id": st.session_state.session_id
                     },
                     headers={"Content-Type": "application/json"},
-                    timeout=30,
+                    timeout=60,
                     verify=False
                 )
 

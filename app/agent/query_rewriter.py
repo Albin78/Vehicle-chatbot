@@ -1,8 +1,11 @@
-from typing import List, Dict
+from typing import List, Dict, Any
 from app.llm.ollama_client import OllamaClient
 from app.utils.logger import logger
 
-from typing import Any
+# Fix #2: module-level singleton — avoids re-allocating per request
+_llm = OllamaClient()
+
+
 def rewrite_query(current_query: str, history: List[Dict[str, str]], last_intent: Dict[str, Any] = None) -> str:
     if not history:
         return current_query
@@ -109,24 +112,17 @@ User query to rewrite: {current_query}
 [/INST]"""
 
     try:
-        # logger.info(f"LLM PROMPT:\n{prompt}")
-        client = OllamaClient()
-        rewritten_query = client.generate(prompt)
+        # Fix #2: use module-level singleton instead of per-call OllamaClient()
+        rewritten_query = _llm.generate(prompt)
         rewritten_query = rewritten_query.strip()
         # Remove quotes if the LLM added them
         if rewritten_query.startswith('"') and rewritten_query.endswith('"'):
             rewritten_query = rewritten_query[1:-1]
+
+        # Fix #3: removed raw /tmp file write — logger already captures this
         logger.info(f"Original query: {current_query} -> Rewritten query: {rewritten_query}")
-        
-        with open("/tmp/query_rewrite_debug.log", "a") as f:
-            f.write(f"last_vehicle_id: {last_vehicle_id}\n")
-            f.write(f"history: {history_text}\n")
-            f.write(f"original: {current_query}\n")
-            f.write(f"rewritten: {rewritten_query}\n")
-            f.write("-" * 50 + "\n")
-            
-        return rewritten_query
-        logger.info(f"Original query: {current_query} -> Rewritten query: {rewritten_query}")
+
+        # Fix #1: removed dead code (duplicate logger.info + return that were unreachable)
         return rewritten_query
     except Exception as e:
         logger.error(f"Error rewriting query: {e}")

@@ -116,6 +116,24 @@ def generate_response(result, intent):
             f"INPUT: {base_message}\n"
             "OUTPUT:"
         )
+    elif result.get("type") in ["alert_summary", "overspeed_summary", "idling_summary", "afterhours_summary", "daily_alert_summary"]:
+        prompt = (
+            "You are a professional fleet management chatbot. Your task is to rewrite the vehicle alert INPUT below into a natural, friendly, and highly professional OUTPUT response.\n"
+            "\n"
+            "CRITICAL CONTRACT:\n"
+            "1. EXACT FACTS ONLY: You MUST ONLY use the exact facts, dates, numbers, and locations provided in the INPUT. NEVER fabricate or invent information.\n"
+            "2. NO FILLER: Do not add introductory headers, extra commentary, conversational filler, or 'Note:' sections.\n"
+            "3. PRESERVE STRUCTURE: If the INPUT contains bullet points, a breakdown, or a list, you MUST preserve them as a clean bulleted list in Markdown format.\n"
+            "4. NO QUOTES: Do not add quotation marks around names or metrics.\n"
+            "5. DIRECT ANSWER: Ensure your response directly and explicitly answers the core question asked in the USER_QUERY using the facts from the INPUT.\n"
+            "6. LOCATION URLS: If a Google Maps URL is present, preserve it completely as a clickable link.\n"
+            "\n"
+            "Strictly output ONLY the polished response and absolutely nothing else.\n"
+            "\n"
+            f"USER_QUERY: {query_str}\n"
+            f"INPUT: {base_message}\n"
+            "OUTPUT:"
+        )
     else:
         prompt = (
             "You are a professional fleet management chatbot. Your task: rewrite the telemetry INPUT below into a natural, friendly, and highly professional OUTPUT sentence.\n"
@@ -132,6 +150,7 @@ def generate_response(result, intent):
             "- For descriptive fields (camera, seatbelt, ignition, door, immobilization, tanker_status, gsm_signal), preserve the exact descriptive phrase from INPUT.\n"
             "- DRIVER RULE: If driver details are explicitly present in the INPUT and the driver is 'null', 'NA', 'None', 'Unknown', or 'Unassigned', output 'driver details are not currently available' or 'does not have a driver assigned'. Do not mention drivers at all if they are not included in the INPUT.\n"
             "- VEHICLE IDENTIFIERS: Never split a vehicle's identifier into a separate 'ID' and 'Name'. Treat the entire identifier as a single immutable string. Do NOT invent vehicle identifiers.\n"
+            "- WASL IDENTIFIER RULE: If the user asks for WASL status or identity, strictly provide ONLY the WASL identity number from the INPUT. NEVER invent or hallucinate a separate 'WASL status' (e.g. do not say 'has a WASL status of WSL-1234567').\n"
             "- LOCATION RULE: If the INPUT contains a Google Maps URL (e.g., 'current location: https://maps.google.com/?q=...' or 'Location map: https://...'), you MUST preserve and include the full URL exactly as given in the OUTPUT. NEVER convert a Maps URL into raw coordinates or plain text like 'located at lat, lon'. Always present it as a clickable link in the format: 'Vehicle [ID] is currently located at [Google Maps URL]'.\n"
             "7. DIRECT ANSWER: Ensure your response directly and explicitly answers the core question asked in the USER_QUERY using the facts from the INPUT. For example, if the user asks 'on which day', highlight that day clearly. If the user asks for a specific metric, highlight it prominently.\n"
             "8. DATE RANGE: Always explicitly mention the exact date range in your response if it is provided in the INPUT (e.g., 'between [Start Date] and [End Date]'). Do NOT invent or copy dates from these instructions; use ONLY the dates provided in the INPUT.\n"
@@ -154,6 +173,11 @@ def generate_response(result, intent):
             "<example>\n"
             "INPUT: For vehicle 1832 RXB, vehicle is a tanker.\n"
             "OUTPUT: Vehicle 1832 RXB is a tanker.\n"
+            "</example>\n"
+            "\n"
+            "<example>\n"
+            "INPUT: For vehicle 4673 JRB, WASL identity number is 3BB91993-1A0F-43EF-B554-CA55E36CAECD.\n"
+            "OUTPUT: Vehicle 4673 JRB has a WASL identity number of 3BB91993-1A0F-43EF-B554-CA55E36CAECD.\n"
             "</example>\n"
             "\n"
             "<example>\n"

@@ -14,5 +14,6 @@ COPY app/ ./app/
 
 # COPY ssl/privkey.pem /app/privkey.pem
 
-EXPOSE 5008
-CMD ["sh", "-c", "if [ -s /app/ssl/fullchain.pem ] && [ -s /app/ssl/privkey.pem ]; then streamlit run app/streamlit_app.py --server.address=0.0.0.0 --server.port=5008 --server.sslCertFile=/app/ssl/fullchain.pem --server.sslKeyFile=/app/ssl/privkey.pem; else streamlit run app/streamlit_app.py --server.address=0.0.0.0 --server.port=5008; fi"]
+ENV PORT=8080
+EXPOSE ${PORT}
+CMD ["sh", "-c", "if [ -s /app/ssl/fullchain.pem ] && [ -s /app/ssl/privkey.pem ]; then streamlit run app/streamlit_app.py --server.address=0.0.0.0 --server.port=${PORT} --server.sslCertFile=/app/ssl/fullchain.pem --server.sslKeyFile=/app/ssl/privkey.pem; else streamlit run app/streamlit_app.py --server.address=0.0.0.0 --server.port=${PORT}; fi"]

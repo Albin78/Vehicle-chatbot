@@ -524,35 +524,14 @@ def extract_vehicle_candidates(query: str):
     return final
 
 
-def build_vehicle_lookup(vehicle_cache):
-    
-    # logger.info(f"Vehicle cache passed to lookup: {vehicle_cache}")
-    lookup = {}
-
-    for vehicle in vehicle_cache["data"]:
-
-        vehicle_id = vehicle.get("NumberPlate")
-
-        if vehicle_id:
-
-            normalized = normalize_vehicle_id(vehicle_id)
-
-            lookup[normalized] = vehicle
-
-    return lookup
-
-
 def resolve_vehicle(query, vehicle_cache):
-    
-    # logger.info(f"Cache from resolve vehicle: {vehicle_cache}")
-    vehicle_lookup = build_vehicle_lookup(vehicle_cache)
+   
+    # cache["index"] is already keyed by normalize_vehicle_id(NumberPlate)
+    index = vehicle_cache.get("index", {})
     candidates = extract_vehicle_candidates(query)
 
     for candidate in candidates:
-
-        vehicle = vehicle_lookup.get(candidate)
-
-        if vehicle:
+        if candidate in index:
             return candidate
 
     return None

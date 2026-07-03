@@ -47,10 +47,12 @@ def extract_aggregation(query: str):
     if any(word in q for word in ["average", "mean"]) or re.search(r'\bavg\b', q):
         return "average"
 
-    if any(word in q for word in ["maximum", "highest", "peak"]) or re.search(r'\bmax\b', q):
+    # NOTE: 'most' and 'least' must be checked with word boundaries to avoid
+    # false matches inside words. They map to maximum/minimum for aggregation.
+    if any(word in q for word in ["maximum", "highest", "peak"]) or re.search(r'\bmax\b', q) or re.search(r'\bmost\b', q):
         return "maximum"
 
-    if any(word in q for word in ["minimum", "lowest"]) or re.search(r'\bmin\b', q):
+    if any(word in q for word in ["minimum", "lowest"]) or re.search(r'\bmin\b', q) or re.search(r'\bleast\b', q):
         return "minimum"
 
     if "total" in q or re.search(r'\bsum\b', q):
@@ -115,6 +117,11 @@ ALERT_ENABLE_KEYWORDS = [
     "alert disabled",
     "enable alert",
     "disable alert",
+    # BUG FIX: standalone 'enable'/'disable' (e.g. 'disable the seatbelt alert')
+    # were not matched by any keyword above — causing detect_alert_enable_query()
+    # to return False for perfectly valid user phrasing.
+    "enable",
+    "disable",
     "turned on",
     "turned off",
     "alert is on",
@@ -364,6 +371,22 @@ def detect_source(
             if start_date == today and end_date == today:
                 is_today_only = True
 
+    # BUG FIX: Historical operational metric queries for a single vehicle
+    # (e.g. "idle time for 0017 BRD this week", "moving time last week") were
+    # being routed to 'latest' because they matched no aggregation keyword and
+    # the only time-range guard was inside the 'summary' block.  Now we
+    # explicitly promote any historical-metric query with a non-today time range
+    # to 'summary' so it is correctly served from operationSummary data.
+    HISTORICAL_METRICS = [
+        "idle time", "idling time",
+        "moving time", "drive time", "driving time",
+        "stop time", "stopped time",
+        "engine hour", "engine hours",
+        "distance", "mileage",
+    ]
+    if time_range and not is_today_only and any(hm in q for hm in HISTORICAL_METRICS):
+        return "summary"
+
     # SUMMARY
     # If the range is strictly for today, only route to summary if explicitly requested via "summary" or "report"
     if is_today_only:
@@ -502,7 +525,7 @@ def _extract_fleet_fields(query: str) -> dict:
         fleet_scope, fleet_metric, fleet_aggregation,
         fleet_subject, fleet_filter, fleet_query_type
     """
-    import re
+    # Fix #5: re is imported at module top — removed 3 inline `import re` that were here
     q = re.sub(r'[?.,!]', '', query.lower())
     qtype = None  # May be overridden by multi-status detection before the QUERY TYPE section
 
@@ -519,7 +542,6 @@ def _extract_fleet_fields(query: str) -> dict:
         subject = "vehicle"
 
     # ---- AGGREGATION ------------------------------------------------
-    import re
     if re.search(r'\btop\s+\d+\b', q) or any(w in q for w in ["rank", "list all", "all vehicles", "ranking"]):
         aggregation = "list"
     elif any(w in q for w in ["highest", "maximum", "max", "most", "peak", "worst", "fastest", "top"]):
@@ -534,8 +556,7 @@ def _extract_fleet_fields(query: str) -> dict:
     # ---- METRIC -----------------------------------------------------
     metric = None
 
-    import re
-    # Check for alert-list intent: "which vehicles overspeed today" or "havign idling this week"
+    # Check for alert-list intent: "which vehicles overspeed today" or "having idling this week"
     _has_ranking = any(w in q for w in ["highest", "maximum", "max", "most", "peak", "worst", "fastest", "top", "lowest", "minimum", "min", "least", "slowest"])
     
     alert_focus_list = extract_alert_focus(q)
@@ -555,7 +576,7 @@ def _extract_fleet_fields(query: str) -> dict:
         metric = "alerts"
     elif any(w in q for w in ["speed", "overspeed", "fastest", "slowest"]) or re.search(r'\bfast\b', q):
         metric = "speed"
-    elif any(w in q for w in ["distance", "km", "kilometres", "mileage"]):
+    elif any(w in q for w in ["distance", "km", "kilometres", "mileage", "travel", "travelled", "traveled"]):
         metric = "distance"
     elif any(w in q for w in ["idle", "idling"]):
         if any(w in q for w in ["most", "highest", "time", "least", "lowest"]):
@@ -718,7 +739,8 @@ def detect_summary_requested(query: str):
 
 def post_validate(
     clean_data: dict,
-    query: str
+    query: str,
+    company_id: int = 16,   # Fix #6+7: accept company_id param; default preserves existing behaviour
 ):
 
     try:
@@ -728,8 +750,10 @@ def post_validate(
                 clean_data.get("action"),
                 query
             )
-             
-        vehicle_cache = get_vehicle_cache(company_id=16)
+
+        # Fix #6: vehicle resolution is owned by route.py; post_validate only
+        # sanitizes the LLM-extracted vehicle_id string (no cache lookup here).
+        vehicle_cache = get_vehicle_cache(company_id=company_id)
         resolved_id = resolve_vehicle(query, vehicle_cache)
         
         if resolved_id:

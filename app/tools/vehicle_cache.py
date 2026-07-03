@@ -5,6 +5,9 @@ import re
 
 from app.tools.external_api_tool import get_vehicle_details
 from app.utils.logger import logger
+# Fix #9: import normalize_vehicle_id from its canonical location instead of
+# maintaining a duplicate definition here.
+from app.validators.intent_validator import normalize_vehicle_id
 
 
 # =========================================================
@@ -39,35 +42,6 @@ CACHE_TTL = {
 # NORMALIZATION
 # =========================================================
 
-
-
-import re
-
-
-def normalize_vehicle_id(v_id: str) -> str:
-
-    if not v_id:
-        return ""
-
-    v_id = v_id.upper()
-
-    parts = re.findall(
-        r"[A-Z]+|\d+",
-        v_id
-    )
-
-    numbers = []
-    letters = []
-
-    for part in parts:
-
-        if part.isdigit():
-            numbers.append(part)
-
-        else:
-            letters.append(part)
-
-    return "".join(numbers) + "".join(letters)
 
 
 # =========================================================

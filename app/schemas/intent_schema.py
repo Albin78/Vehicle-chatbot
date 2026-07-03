@@ -52,7 +52,7 @@ class QueryIntent(BaseModel):
 
     time_range: Optional[tuple[str, str]] = None
     
-    alert_focus: Optional[str] = ""
+    alert_focus: Optional[str] = None
 
     alert_response_type: str = ""
     

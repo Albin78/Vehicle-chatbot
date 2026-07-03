@@ -1,4 +1,5 @@
 import re
+import threading
 from fastapi import APIRouter
 from time import time
 
@@ -16,8 +17,21 @@ from app.agent.query_rewriter import rewrite_query
 router = APIRouter()
 
 
+# Fix #11: protect the counter with a Lock — Uvicorn runs sync handlers in a
+# threadpool, so a plain `int += 1` is a race condition under concurrent load.
+_request_counter_lock = threading.Lock()
+GLOBAL_REQUEST_COUNT = 0
+MAX_REQUESTS = 200
+
 @router.post("/query")
 def query_system(data: QueryRequest):
+    global GLOBAL_REQUEST_COUNT
+
+    with _request_counter_lock:
+        if GLOBAL_REQUEST_COUNT >= MAX_REQUESTS:
+            logger.warning("Global request limit reached.")
+            return {"response": "Temporary deployment limit reached: The maximum of 15 requests has been fulfilled. Please try again later."}
+        GLOBAL_REQUEST_COUNT += 1
 
     start_time = time()
 
